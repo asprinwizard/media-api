@@ -1,21 +1,48 @@
-# Media02 (new site) — Apache vhost template.
+# Media02 (new site) — Apache vhost.
 #
-# Replace media-next.example.com and the paths, then compare against the live
-# media-web vhost (copy it into deploy/live-vhost.conf for reference) and carry
-# over anything site-specific: the /media, /public and /hls blocks below are
-# guesses at what the live config does and MUST be checked against it.
+# Based on the live media.aspdendev.com vhost (2026-11-18), with these changes:
+#   - Basic auth for the whole site lives here (not in .htaccess), covering
+#     every HTTP method; auth files moved to /etc/apache2/media-auth/
+#   - /public and /hls now require login (both were open to the internet)
+#   - restricted library folders are admin-only for direct /media links too
+#   - the media-web SERVER_ROOT / INCLUDEPATH env vars are no longer needed
 #
-# Requires: mod_php (php8.4), mod_rewrite, mod_authz_groupfile, mod_xsendfile,
-#           mod_proxy + mod_proxy_http (for /hls), mod_ssl.
+# Install as /etc/apache2/sites-available/media-next.conf. The TLS certificate
+# comes from certbot (see .documentation/media-site/staging-setup.md).
+# When the site moves to media.aspdendev.com, change both ServerName lines,
+# the certificate paths and APP_URL in media-api/.env.
+#
+# Modules: php8.4, rewrite, authz_groupfile, xsendfile, proxy, proxy_http,
+#          headers, ssl.
+
+<VirtualHost *:80>
+    ServerName media-next.aspdendev.com
+    # Plain HTTP only redirects (certbot's renewal also uses port 80).
+    RewriteEngine on
+    RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]
+</VirtualHost>
 
 <VirtualHost *:443>
-    ServerName media-next.example.com
+    ServerName media-next.aspdendev.com
 
     SSLEngine on
-    SSLCertificateFile    /etc/letsencrypt/live/media-next.example.com/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/media-next.example.com/privkey.pem
+    SSLCertificateFile    /etc/letsencrypt/live/media-next.aspdendev.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/media-next.aspdendev.com/privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
 
-    # --- SPA ---------------------------------------------------------------
+    ErrorLog  /var/log/apache2/media-next-error.log
+    CustomLog /var/log/apache2/media-next-access.log combined
+
+    # --- Basic auth: every path, every HTTP method (no <Limit>) --------------
+    <Location />
+        AuthType Basic
+        AuthName "Media02"
+        AuthUserFile  /etc/apache2/media-auth/.htpasswd
+        AuthGroupFile /etc/apache2/media-auth/.htgroup
+        Require group admin ftp standard
+    </Location>
+
+    # --- SPA (media-app/dist) -------------------------------------------------
     DocumentRoot /home/sites/media-app/dist
     <Directory /home/sites/media-app/dist>
         Options -Indexes
@@ -24,7 +51,8 @@
         FallbackResource /index.html
     </Directory>
 
-    # --- API (Laravel) -------------------------------------------------------
+    # --- API (media-api) under /api --------------------------------------------
+    # Laravel sees /api as its base path, so its routes have no /api prefix.
     Alias /api /home/sites/media-api/public
     <Directory /home/sites/media-api/public>
         Options -Indexes +FollowSymLinks
@@ -36,32 +64,22 @@
         RewriteRule ^ index.php [L]
     </Directory>
 
-    # --- Basic auth: every path, every HTTP method (no <Limit>) --------------
-    <Location />
-        AuthType Basic
-        AuthName "Website Restriction"
-        AuthUserFile  /etc/apache2/media-auth/.htpasswd
-        AuthGroupFile /etc/apache2/media-auth/.htgroup
-        Require group admin ftp standard
-    </Location>
-
-    # Signed, unauthenticated links for Chromecast. Matched on the ORIGINAL
-    # request line, because after the rewrite to index.php Apache re-checks
-    # auth against the new URI and a <Location /api/public> block would no
-    # longer apply. Phase 1 test: unauthenticated curl with a Range header.
+    # Signed, unauthenticated links for Chromecast (Phase 2). Matched on the
+    # ORIGINAL request line: after the rewrite to index.php Apache re-checks
+    # auth against the new URI, where a <Location /api/public> would not apply.
     <If "%{THE_REQUEST} =~ m#^[A-Z]+ /api/public/#">
         Require all granted
     </If>
 
-    # Laravel serves downloads/streams via X-Sendfile (Range handled by Apache,
-    # which avoids PHP's 2 GB limit on this 32-bit system).
+    # Laravel sends X-Sendfile; Apache streams the file and handles Range
+    # (PHP can't on this 32-bit system for files over 2 GB).
     XSendFile On
-    XSendFilePath /home/share
+    XSendFilePath /home/share/
 
-    # --- Direct media links (as on the live site) ---------------------------
-    Alias /media /home/share
-    <Directory /home/share>
-        Options -Indexes +FollowSymLinks
+    # --- Direct media links -------------------------------------------------
+    Alias /media/ "/home/share/"
+    <Directory /home/share/>
+        Options FollowSymLinks
         AllowOverride None
     </Directory>
     # Restricted library folders: admins only, also for direct links
@@ -69,19 +87,20 @@
         Require group admin
     </LocationMatch>
 
-    # Queue files, logs, iPlayer info: admins only
-    Alias /public /home/public/media
-    <Location /public>
+    # --- Queue files, activity logs, iPlayer info: admins only ---------------
+    Alias /public/ "/home/public/media/"
+    <Directory "/home/public/media/">
+        Options FollowSymLinks
+        AllowOverride None
+    </Directory>
+    <Location /public/>
         Require group admin
     </Location>
 
-    # --- Live TV HLS stream from media08 ------------------------------------
-    ProxyPass        /hls/ http://media08:1706/hls/
-    ProxyPassReverse /hls/ http://media08:1706/hls/
-    <Location /hls>
+    # --- Live TV: HLS from the tuner box (admins only) -----------------------
+    ProxyPass        /hls/ http://192.168.1.115:1706/hls/
+    ProxyPassReverse /hls/ http://192.168.1.115:1706/hls/
+    <Location /hls/>
         Require group admin
     </Location>
-
-    ErrorLog  ${APACHE_LOG_DIR}/media-next-error.log
-    CustomLog ${APACHE_LOG_DIR}/media-next-access.log combined
 </VirtualHost>
