@@ -1,0 +1,87 @@
+# Media02 (new site) — Apache vhost template.
+#
+# Replace media-next.example.com and the paths, then compare against the live
+# media-web vhost (copy it into deploy/live-vhost.conf for reference) and carry
+# over anything site-specific: the /media, /public and /hls blocks below are
+# guesses at what the live config does and MUST be checked against it.
+#
+# Requires: mod_php (php8.4), mod_rewrite, mod_authz_groupfile, mod_xsendfile,
+#           mod_proxy + mod_proxy_http (for /hls), mod_ssl.
+
+<VirtualHost *:443>
+    ServerName media-next.example.com
+
+    SSLEngine on
+    SSLCertificateFile    /etc/letsencrypt/live/media-next.example.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/media-next.example.com/privkey.pem
+
+    # --- SPA ---------------------------------------------------------------
+    DocumentRoot /home/sites/media-app/dist
+    <Directory /home/sites/media-app/dist>
+        Options -Indexes
+        AllowOverride None
+        # Unknown paths (e.g. /library/TV/Drama) load the SPA
+        FallbackResource /index.html
+    </Directory>
+
+    # --- API (Laravel) -------------------------------------------------------
+    Alias /api /home/sites/media-api/public
+    <Directory /home/sites/media-api/public>
+        Options -Indexes +FollowSymLinks
+        AllowOverride None
+        DirectoryIndex index.php
+        RewriteEngine On
+        RewriteBase /api
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteRule ^ index.php [L]
+    </Directory>
+
+    # --- Basic auth: every path, every HTTP method (no <Limit>) --------------
+    <Location />
+        AuthType Basic
+        AuthName "Website Restriction"
+        AuthUserFile  /etc/apache2/media-auth/.htpasswd
+        AuthGroupFile /etc/apache2/media-auth/.htgroup
+        Require group admin ftp standard
+    </Location>
+
+    # Signed, unauthenticated links for Chromecast. Matched on the ORIGINAL
+    # request line, because after the rewrite to index.php Apache re-checks
+    # auth against the new URI and a <Location /api/public> block would no
+    # longer apply. Phase 1 test: unauthenticated curl with a Range header.
+    <If "%{THE_REQUEST} =~ m#^[A-Z]+ /api/public/#">
+        Require all granted
+    </If>
+
+    # Laravel serves downloads/streams via X-Sendfile (Range handled by Apache,
+    # which avoids PHP's 2 GB limit on this 32-bit system).
+    XSendFile On
+    XSendFilePath /home/share
+
+    # --- Direct media links (as on the live site) ---------------------------
+    Alias /media /home/share
+    <Directory /home/share>
+        Options -Indexes +FollowSymLinks
+        AllowOverride None
+    </Directory>
+    # Restricted library folders: admins only, also for direct links
+    <LocationMatch "^/media/Video/(Torrent Downloads|Uploaded Files)(/|$)">
+        Require group admin
+    </LocationMatch>
+
+    # Queue files, logs, iPlayer info: admins only
+    Alias /public /home/public/media
+    <Location /public>
+        Require group admin
+    </Location>
+
+    # --- Live TV HLS stream from media08 ------------------------------------
+    ProxyPass        /hls/ http://media08:1706/hls/
+    ProxyPassReverse /hls/ http://media08:1706/hls/
+    <Location /hls>
+        Require group admin
+    </Location>
+
+    ErrorLog  ${APACHE_LOG_DIR}/media-next-error.log
+    CustomLog ${APACHE_LOG_DIR}/media-next-access.log combined
+</VirtualHost>
