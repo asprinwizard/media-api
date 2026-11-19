@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Acquire;
 
+use App\Acquire\Upload\ChunkedUploads;
+use App\Acquire\Upload\UploadRefused;
 use App\Auth\MediaUser;
 use App\Http\Controllers\Controller;
 use App\Library\DirectoryEntry;
@@ -14,8 +16,9 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Upload page (admin, ftp): one file per POST into the upload folder
- * (port of ftp/xhr_upload_file.php and xhr_get_folder_contents.php).
+ * Upload page (admin, ftp): files arrive in chunks (see ChunkedUploads)
+ * and land in the upload folder (port of ftp/xhr_upload_file.php and
+ * xhr_get_folder_contents.php).
  */
 class UploadController extends Controller
 {
@@ -30,7 +33,7 @@ class UploadController extends Controller
         $entries = is_dir($folder->absolute()) ? $reader->read($folder->absolute()) : [];
 
         return response()->json([
-            'maxBytes' => self::maxUploadBytes(),
+            'chunkBytes' => self::chunkBytes(),
             'items' => array_map(fn (DirectoryEntry $e) => [
                 'name' => $e->name,
                 'type' => $e->type->value,
@@ -40,46 +43,84 @@ class UploadController extends Controller
         ]);
     }
 
-    public function store(Request $request, MediaUser $user): JsonResponse
+    /**
+     * Start a chunked upload: {name, size} → {id, name, chunkBytes}.
+     */
+    public function start(Request $request, MediaUser $user, ChunkedUploads $uploads): JsonResponse
     {
-        $file = $request->file('file');
-        if (! $file instanceof UploadedFile) {
-            // PHP drops the whole body when it's over post_max_size.
-            return response()->json(['message' => 'No file arrived. It may be bigger than the server allows ('.self::human(self::maxUploadBytes()).').'], 422);
-        }
-        if (! $file->isValid()) {
-            $message = in_array($file->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)
-                ? 'That file is bigger than the server allows ('.self::human(self::maxUploadBytes()).').'
-                : 'The upload didn\'t complete. Please try again.';
+        $input = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'size' => ['required', 'numeric', 'min:0', 'max:1099511627776'],
+        ]);
 
-            return response()->json(['message' => $message], 422);
+        return $this->attempt(function () use ($input, $user, $uploads) {
+            $started = $uploads->start($input['name'], (float) $input['size'], $user->username);
+
+            return response()->json($started + ['chunkBytes' => self::chunkBytes()], 201);
+        });
+    }
+
+    /**
+     * One chunk (multipart field "chunk"), number ?index= (0-based).
+     */
+    public function chunk(Request $request, string $id, MediaUser $user, ChunkedUploads $uploads): JsonResponse
+    {
+        $index = filter_var($request->query('index'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        $file = $request->file('chunk');
+        if ($index === false) {
+            return response()->json(['message' => 'Missing chunk number.'], 422);
+        }
+        if (! $file instanceof UploadedFile || ! $file->isValid()) {
+            return response()->json(['message' => 'That part of the file didn\'t arrive. It will be retried.'], 422);
         }
 
-        $name = trim(basename(str_replace('\\', '/', $file->getClientOriginalName())));
-        if ($name === '' || str_starts_with($name, '.')) {
-            return response()->json(['message' => 'That file name can\'t be used.'], 422);
-        }
-        $target = $this->paths->upload($name);
-        if (file_exists($target->absolute())) {
-            return response()->json(['message' => "\"{$name}\" is already in the upload folder. Rename it and try again."], 409);
-        }
+        return $this->attempt(fn () => response()->json(
+            $uploads->append($id, $index, $file->getPathname(), $user->username),
+        ));
+    }
 
-        // Read the size before moving (the temp file goes), and don't let a
-        // failed stat (files over 2 GB on 32-bit PHP) stop the upload.
-        $size = rescue(fn () => $file->getSize(), null, false);
+    public function finish(string $id, MediaUser $user, ChunkedUploads $uploads): JsonResponse
+    {
+        set_time_limit(0);
 
+        return $this->attempt(function () use ($id, $user, $uploads) {
+            $done = $uploads->finish($id, $user->username);
+            Log::info('upload', ['user' => $user->username, 'file' => $done['name'], 'size' => $done['size']]);
+
+            return response()->json(['name' => $done['name']], 201);
+        });
+    }
+
+    public function cancel(string $id, MediaUser $user, ChunkedUploads $uploads): JsonResponse
+    {
+        return $this->attempt(function () use ($id, $user, $uploads) {
+            $uploads->cancel($id, $user->username);
+
+            return response()->json(null, 204);
+        });
+    }
+
+    /**
+     * Chunk size: the configured size, kept well inside PHP's own limits.
+     */
+    public static function chunkBytes(): int
+    {
+        $configured = (int) config('media.upload.chunk_bytes');
+        $php = self::maxUploadBytes();
+
+        return (int) max(256 * 1024, $php === null ? $configured : min($configured, floor($php * 0.9)));
+    }
+
+    /**
+     * @param  callable(): JsonResponse  $work
+     */
+    private function attempt(callable $work): JsonResponse
+    {
         try {
-            $file->move(dirname($target->absolute()), $name);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => 'The file couldn\'t be saved on the server.'], 500);
+            return $work();
+        } catch (UploadRefused $e) {
+            return response()->json(['message' => $e->getMessage()] + $e->extra, $e->status);
         }
-        @chmod($target->absolute(), 0664);
-
-        Log::info('upload', ['user' => $user->username, 'file' => $name, 'size' => $size]);
-
-        return response()->json(['name' => $name], 201);
     }
 
     /** The smaller of upload_max_filesize and post_max_size, in bytes (null = unlimited). */
@@ -108,14 +149,5 @@ class UploadController extends Controller
             'k' => $number * 1024,
             default => $number,
         };
-    }
-
-    private static function human(?float $bytes): string
-    {
-        if ($bytes === null) {
-            return 'no limit';
-        }
-
-        return $bytes >= 1024 ** 3 ? round($bytes / 1024 ** 3, 1).' GB' : round($bytes / 1024 ** 2).' MB';
     }
 }

@@ -109,6 +109,15 @@ return [
         'timeout' => (int) env('MEDIA_EXTRACT_TIMEOUT', 3 * 3600),
     ],
 
+    // Upload page (admin, ftp). Files arrive in chunks, appended in a
+    // working folder that should be on the same drive as the upload folder
+    // (so the final move is instant) and outside it (so it isn't listed).
+    'upload' => [
+        'chunks_dir' => env('MEDIA_UPLOAD_CHUNKS_DIR', storage_path('app/upload-chunks')),
+        'chunk_bytes' => (int) env('MEDIA_UPLOAD_CHUNK_BYTES', 32 * 1024 * 1024),
+        'stale_hours' => (int) env('MEDIA_UPLOAD_STALE_HOURS', 24),
+    ],
+
     // BBC iPlayer (admin). get-iplayer runs through sudo, as before; its own
     // options file sets the output folder (download_dir) and filename format.
     'iplayer' => [

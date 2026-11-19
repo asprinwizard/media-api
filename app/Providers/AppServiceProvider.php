@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Acquire\Iplayer\IplayerService;
+use App\Acquire\Upload\ChunkedUploads;
 use App\Acquire\Youtube\YoutubeService;
 use App\Admin\Convert\CloudConvertConverter;
 use App\Admin\Convert\Converter;
@@ -66,6 +67,12 @@ class AppServiceProvider extends ServiceProvider
             config('services.sftp'),
         ));
 
+        $this->app->bind(ChunkedUploads::class, fn ($app) => new ChunkedUploads(
+            $app->make(LocalShell::class),
+            $app->make(MediaPathResolver::class),
+            config('media.upload.chunks_dir'),
+            config('media.upload.stale_hours'),
+        ));
         $this->app->bind(IplayerService::class, fn ($app) => new IplayerService(
             $app->make(LocalShell::class),
             $app->make(DirectoryReader::class),

@@ -55,46 +55,100 @@ function waitFor(callable $condition, float $seconds = 5): bool
 }
 
 describe('upload', function () {
+    beforeEach(function () {
+        config()->set('media.upload.chunks_dir', "{$this->base}/chunks");
+        $this->xhr = ['X-Requested-With' => 'XMLHttpRequest'];
+        $this->send = function (string $user, string $id, int $index, string $bytes) {
+            $tmp = tempnam(sys_get_temp_dir(), 'chunk');
+            file_put_contents($tmp, $bytes);
+
+            return asUser($user)->post("/uploads/$id/chunks?index=$index", ['chunk' => new UploadedFile($tmp, 'blob', null, null, true)], $this->xhr);
+        };
+    });
+
     it('is for admin and ftp users only', function () {
         asUser('alice')->getJson('/uploads')->assertForbidden();
-        asUser('bob')->getJson('/uploads')->assertOk()->assertJsonStructure(['maxBytes', 'items']);
+        asUser('alice')->postJson('/uploads', ['name' => 'a.mp4', 'size' => 1])->assertForbidden();
+        asUser('bob')->getJson('/uploads')->assertOk()->assertJsonStructure(['chunkBytes', 'items']);
     });
 
-    it('saves a file, lists it, and refuses to overwrite', function () {
-        $file = UploadedFile::fake()->create('Holiday Film.mp4', 12);
-        asUser('bob')->post('/uploads', ['file' => $file], ['X-Requested-With' => 'XMLHttpRequest'])
-            ->assertCreated()->assertJsonPath('name', 'Holiday Film.mp4');
-        expect(is_file("{$this->base}/upload/Holiday Film.mp4"))->toBeTrue();
+    it('assembles a file from chunks and moves it into the upload folder', function () {
+        $id = asUser('bob')->postJson('/uploads', ['name' => 'Holiday Film.mp4', 'size' => 10])
+            ->assertCreated()->assertJsonPath('name', 'Holiday Film.mp4')->json('id');
 
-        // the get_iplayer and youtube folders, then the new file
-        expect(collect(asUser('bob')->getJson('/uploads')->json('items'))->pluck('name')->all())
-            ->toContain('Holiday Film.mp4')->toHaveCount(3);
+        ($this->send)('bob', $id, 0, 'abcd')->assertOk()->assertJsonPath('received', 1);
+        ($this->send)('bob', $id, 1, 'efgh')->assertOk()->assertJsonPath('received', 2);
+        ($this->send)('bob', $id, 2, 'ij')->assertOk()->assertJsonPath('bytes', 10);
+        asUser('bob')->postJson("/uploads/$id/finish")->assertCreated()->assertJsonPath('name', 'Holiday Film.mp4');
 
-        asUser('bob')->post('/uploads', ['file' => UploadedFile::fake()->create('Holiday Film.mp4', 1)], ['X-Requested-With' => 'XMLHttpRequest'])
-            ->assertStatus(409);
+        expect(file_get_contents("{$this->base}/upload/Holiday Film.mp4"))->toBe('abcdefghij')
+            ->and(is_dir("{$this->base}/chunks/$id"))->toBeFalse();
+        expect(collect(asUser('bob')->getJson('/uploads')->json('items'))->pluck('name'))->toContain('Holiday Film.mp4');
     });
 
-    it('saves a real (non-fake) uploaded file', function () {
-        $tmp = tempnam(sys_get_temp_dir(), 'up');
-        file_put_contents($tmp, str_repeat('x', 2048));
-        $file = new UploadedFile($tmp, 'real.mp4', 'video/mp4', null, true);
-
-        asUser('bob')->post('/uploads', ['file' => $file], ['X-Requested-With' => 'XMLHttpRequest'])->assertCreated();
-        expect(filesize("{$this->base}/upload/real.mp4"))->toBe(2048);
+    it('accepts a retried chunk once, and refuses chunks out of order', function () {
+        $id = asUser('bob')->postJson('/uploads', ['name' => 'a.mp4', 'size' => 6])->json('id');
+        ($this->send)('bob', $id, 0, 'abc')->assertOk();
+        ($this->send)('bob', $id, 0, 'abc')->assertOk()->assertJsonPath('received', 1); // retry: not appended twice
+        ($this->send)('bob', $id, 2, 'zzz')->assertStatus(409)->assertJsonPath('expected', 1);
+        asUser('bob')->postJson("/uploads/$id/finish")->assertStatus(409)->assertJsonPath('expected', 1);
+        ($this->send)('bob', $id, 1, 'def')->assertOk();
+        asUser('bob')->postJson("/uploads/$id/finish")->assertCreated();
+        expect(file_get_contents("{$this->base}/upload/a.mp4"))->toBe('abcdef');
     });
 
-    it('strips paths from the client name and refuses hidden files', function () {
-        asUser('bob')->post('/uploads', ['file' => UploadedFile::fake()->create('../../evil.mp4', 1)], ['X-Requested-With' => 'XMLHttpRequest'])
-            ->assertCreated()->assertJsonPath('name', 'evil.mp4');
-        expect(is_file("{$this->base}/upload/evil.mp4"))->toBeTrue();
-
-        asUser('bob')->post('/uploads', ['file' => UploadedFile::fake()->create('.htaccess', 1)], ['X-Requested-With' => 'XMLHttpRequest'])
-            ->assertStatus(422);
+    it('trims a half-written chunk before appending again', function () {
+        $id = asUser('bob')->postJson('/uploads', ['name' => 'b.mp4', 'size' => 6])->json('id');
+        ($this->send)('bob', $id, 0, 'abc')->assertOk();
+        file_put_contents("{$this->base}/chunks/$id/data", 'de', FILE_APPEND); // an attempt that died part-way
+        ($this->send)('bob', $id, 1, 'def')->assertOk();
+        asUser('bob')->postJson("/uploads/$id/finish")->assertCreated();
+        expect(file_get_contents("{$this->base}/upload/b.mp4"))->toBe('abcdef');
     });
 
-    it('needs the script header (CSRF) and a file', function () {
-        asUser('bob')->post('/uploads', ['file' => UploadedFile::fake()->create('a.mp4', 1)], ['Sec-Fetch-Site' => 'cross-site'])->assertForbidden();
-        asUser('bob')->post('/uploads', [], ['X-Requested-With' => 'XMLHttpRequest'])->assertStatus(422);
+    it('handles files over 2 GB (sizes never pass through a PHP int)', function () {
+        $id = asUser('bob')->postJson('/uploads', ['name' => 'big.mkv', 'size' => 3_000_000_003])->json('id');
+        // Pretend 3 GB already arrived (a sparse file, so no disk is used).
+        exec('truncate -s 3000000000 '.escapeshellarg("{$this->base}/chunks/$id/data"));
+        $state = json_decode(file_get_contents("{$this->base}/chunks/$id/state.json"), true);
+        file_put_contents("{$this->base}/chunks/$id/state.json", json_encode(['received' => 90, 'bytes' => 3_000_000_000.0] + $state, JSON_PRESERVE_ZERO_FRACTION));
+
+        ($this->send)('bob', $id, 90, 'abc')->assertOk()->assertJsonPath('received', 91);
+        asUser('bob')->postJson("/uploads/$id/finish")->assertCreated();
+        expect(trim(exec('stat -c %s '.escapeshellarg("{$this->base}/upload/big.mkv"))))->toBe('3000000003');
+    });
+
+    it('refuses more data than declared', function () {
+        $id = asUser('bob')->postJson('/uploads', ['name' => 'c.mp4', 'size' => 2])->json('id');
+        ($this->send)('bob', $id, 0, 'abcdef')->assertStatus(422);
+        expect(filesize("{$this->base}/chunks/$id/data"))->toBe(0);
+    });
+
+    it('refuses existing names, odd names, and other people\'s uploads', function () {
+        file_put_contents("{$this->base}/upload/taken.mp4", 'x');
+        asUser('bob')->postJson('/uploads', ['name' => 'taken.mp4', 'size' => 1])->assertStatus(409);
+        asUser('bob')->postJson('/uploads', ['name' => '.htaccess', 'size' => 1])->assertStatus(422);
+        asUser('bob')->postJson('/uploads', ['name' => '../../evil.mp4', 'size' => 1])->assertCreated()->assertJsonPath('name', 'evil.mp4');
+
+        $id = asUser('bob')->postJson('/uploads', ['name' => 'mine.mp4', 'size' => 1])->json('id');
+        ($this->send)('richard', $id, 0, 'x')->assertForbidden();
+        asUser('bob')->postJson('/uploads/../../etc/finish')->assertNotFound();
+        asUser('bob')->postJson('/uploads/0123456789abcdef01234567/finish')->assertNotFound();
+    });
+
+    it('cancels, and clears out abandoned uploads', function () {
+        $id = asUser('bob')->postJson('/uploads', ['name' => 'd.mp4', 'size' => 5])->json('id');
+        asUser('bob')->deleteJson("/uploads/$id")->assertNoContent();
+        expect(is_dir("{$this->base}/chunks/$id"))->toBeFalse();
+
+        $old = asUser('bob')->postJson('/uploads', ['name' => 'e.mp4', 'size' => 5])->json('id');
+        touch("{$this->base}/chunks/$old/state.json", time() - 2 * 86400);
+        asUser('bob')->postJson('/uploads', ['name' => 'f.mp4', 'size' => 5])->assertCreated();
+        expect(is_dir("{$this->base}/chunks/$old"))->toBeFalse();
+    });
+
+    it('needs the script header (CSRF)', function () {
+        asUser('bob')->post('/uploads', ['name' => 'a.mp4', 'size' => 1], ['Sec-Fetch-Site' => 'cross-site'])->assertForbidden();
     });
 });
 

@@ -38,7 +38,10 @@ Route::middleware(['media.user', 'same-origin'])->group(function () {
 
     Route::middleware('role:admin,ftp')->controller(UploadController::class)->group(function () {
         Route::get('/uploads', 'index');
-        Route::post('/uploads', 'store');
+        Route::post('/uploads', 'start');
+        Route::post('/uploads/{id}/chunks', 'chunk');
+        Route::post('/uploads/{id}/finish', 'finish');
+        Route::delete('/uploads/{id}', 'cancel');
     });
 
     Route::middleware('role:admin')->prefix('iplayer')->controller(IplayerController::class)->group(function () {
