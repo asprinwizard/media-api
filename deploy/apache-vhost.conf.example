@@ -64,6 +64,13 @@
         RewriteRule ^ index.php [L]
     </Directory>
 
+    # Large uploads. Apache's default body limit is 1 GB; PHP (32-bit) caps
+    # files at upload_max_filesize = 1900M, post_max_size = 1950M, with
+    # max_input_time = 3600 and upload_tmp_dir on the big drive (php.ini).
+    <Location /api/uploads>
+        LimitRequestBody 2097152000
+    </Location>
+
     # --- Media files: always served by Apache, never by PHP -------------------
     # (PHP is 32-bit here and can't handle files over 2 GB; mod_xsendfile fails
     # with "unable to stat file" on these drives.) Apache handles Range/seeking.
