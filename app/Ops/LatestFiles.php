@@ -14,8 +14,8 @@ use App\Support\Shell\RemoteShell;
  */
 class LatestFiles
 {
-    /** $1 root, $2 how many: newest first, "mtime \t size \t relative path". */
-    public const SCRIPT = 'find -L "$1" -type f -printf "%T@\t%s\t%P\n" 2>/dev/null | sort -rn | head -n "$2"';
+    /** $1 root, $2 how many: newest first, "mtime \t size \t relative path". Hidden files and folders are skipped. */
+    public const SCRIPT = 'find -L "$1" -mindepth 1 -name ".*" -prune -o -type f -printf "%T@\t%s\t%P\n" 2>/dev/null | sort -rn | head -n "$2"';
 
     public const PAGE_SIZE = 100;
 

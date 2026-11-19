@@ -30,7 +30,7 @@ class Media01Server implements MediaServer
     private const LISTING = '[ -d "$1" ] || { echo "That folder is not on media01." >&2; exit 3; }; '
         .'find -L "$1" -mindepth 1 -maxdepth 1 -printf "%y\\t%s\\t%T@\\t%f\\0"; exit 0';
 
-    private const FOLDERS = 'find -L "$1" -mindepth 1 -maxdepth 1 -type d -printf "%f\0"';
+    private const FOLDERS = 'find -L "$1" -mindepth 1 -maxdepth 1 -type d ! -name ".*" -printf "%f\0"';
 
     /** Moving a big file between drives can take a while. */
     private const MOVE_TIMEOUT = 3600;

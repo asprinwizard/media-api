@@ -25,6 +25,11 @@ describe('search', function () {
         expect(asUser('alice')->getJson('/search?q=colon')->json('results.0.path'))->toBe('TV/Drama/Show/what: a colon.mp4');
     });
 
+    it('leaves out hidden files and folders listed in the index', function () {
+        file_put_contents("{$this->base}/search/tv.db", "TV/Drama/Show/.thumbs/ep1-hidden.jpg\nTV/Drama/Show/.hidden-ep.mp4\n", FILE_APPEND);
+        expect(collect(asUser('alice')->getJson('/search?q=hidden')->assertOk()->json('results'))->pluck('path')->all())->toBe([]);
+    });
+
     it('hides admin-only folders from other users', function () {
         expect(asUser('alice')->getJson('/search?q=secret')->json('results'))->toBe([]);
         expect(asUser('richard')->getJson('/search?q=secret')->json('results.0.path'))->toBe('Torrent Downloads/secret.mp4');

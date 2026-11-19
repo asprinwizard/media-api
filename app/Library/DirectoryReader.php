@@ -47,6 +47,9 @@ class DirectoryReader
                 continue;
             }
             [$kind, $size, $mtime, $name] = $parts;
+            if (str_starts_with($name, '.')) {
+                continue; // hidden files and folders (.DS_Store, .@__thumb, …) are never listed
+            }
 
             $type = match ($kind) {
                 'd' => FileType::Folder,

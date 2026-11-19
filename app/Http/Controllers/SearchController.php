@@ -48,7 +48,8 @@ class SearchController extends Controller
             } catch (InvalidMediaPath) {
                 continue; // restricted folder for this user, or a malformed line
             }
-            if ($path->isRoot() || isset($seen[$path->relative])) {
+            $hidden = array_filter($path->segments(), fn (string $s) => str_starts_with($s, '.'));
+            if ($path->isRoot() || $hidden !== [] || isset($seen[$path->relative])) {
                 continue;
             }
             if (count($results) >= $limit) {
