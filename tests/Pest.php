@@ -75,7 +75,7 @@ function makeLibrary(): string
     config()->set('media.paths.log_dir', "$base/logs");
     config()->set('media.allowed_mounts', ["$base/drives/hd02"]);
     config()->set('media.search_index', "$base/search");
-    config()->set('media.xsendfile', true);
+    config()->set('media.cast.path', "$base/public-cast");
     app()->forgetInstance(MediaPathResolver::class);
 
     return $base;

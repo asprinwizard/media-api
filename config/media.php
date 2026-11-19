@@ -61,12 +61,15 @@ return [
     'search_index' => env('MEDIA_SEARCH_INDEX', '/home/private/media/search'),
     'search_limit' => (int) env('MEDIA_SEARCH_LIMIT', 1000),
 
-    // Serve files via Apache mod_xsendfile (production). Off in local dev,
-    // where `php artisan serve` streams the file itself instead.
-    'xsendfile' => (bool) env('MEDIA_XSENDFILE', true),
-
-    // Unauthenticated signed links (Chromecast) stay valid this long.
-    'signed_url_ttl_hours' => (int) env('MEDIA_SIGNED_URL_TTL_HOURS', 24),
+    // Chromecast links: a random folder per link holding a symlink to the
+    // file, served by Apache without login at /shared/<token>/<name>.
+    // PHP never reads the media (32-bit PHP can't handle files over 2 GB,
+    // and mod_xsendfile fails on media02's drives).
+    'cast' => [
+        'path' => env('MEDIA_CAST_PATH', '/home/public/cast'),
+        'url_prefix' => '/shared',
+        'ttl_hours' => (int) env('MEDIA_CAST_TTL_HOURS', 24),
+    ],
 
     // Logs shown to admins on the home page (files in paths.log_dir, .log).
     'dashboard_logs' => [

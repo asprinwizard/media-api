@@ -1,7 +1,5 @@
 <?php
 
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
-
 beforeEach(function () {
     useHtgroup("admin: richard\nstandard: alice richard\n");
     $this->base = makeLibrary();
@@ -16,25 +14,21 @@ function activityLog(string $base): array
 }
 
 describe('download', function () {
-    it('hands the file to Apache via X-Sendfile and logs it', function () {
+    it('logs the download and redirects to the Apache-served file with ?download', function () {
         $response = asUser('alice')->get('/files/download?path='.rawurlencode('TV/Drama/Show/Odd #1 & 50% + x.mp4'));
 
-        $response->assertOk()
-            ->assertHeader('X-Sendfile', "{$this->show}/Odd #1 & 50% + x.mp4");
-        expect($response->headers->get('Content-Disposition'))->toStartWith('attachment;')
-            ->and($response->getContent())->toBe('');
+        // Relative on purpose: the browser stays on the same host, Apache serves the file
+        $response->assertStatus(302)
+            ->assertHeader('Location', '/media/Video/TV/Drama/Show/Odd%20%231%20%26%2050%25%20%2B%20x.mp4?download');
 
         expect(activityLog($this->base))->toHaveCount(1)
             ->and(activityLog($this->base)[0])->toMatch('/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d : download : alice : '.preg_quote($this->show, '/').'\/Odd #1 & 50% \+ x\.mp4$/');
     });
 
-    it('streams the file itself when X-Sendfile is off (local dev)', function () {
-        config()->set('media.xsendfile', false);
-
-        $response = asUser('alice')->get('/files/download?path=TV/Drama/Show/ep1.mp4')->assertOk();
-
-        expect($response->headers->has('X-Sendfile'))->toBeFalse()
-            ->and($response->baseResponse)->toBeInstanceOf(BinaryFileResponse::class);
+    it('keeps the redirect relative when served under the /api alias', function () {
+        $this->withServerVariables(['REMOTE_USER' => 'alice', 'SCRIPT_NAME' => '/api/index.php', 'SCRIPT_FILENAME' => base_path('public/index.php'), 'PHP_SELF' => '/api/index.php'])
+            ->get('/api/files/download?path=TV/Drama/Show/ep1.mp4')
+            ->assertHeader('Location', '/media/Video/TV/Drama/Show/ep1.mp4?download');
     });
 
     it('refuses folders, missing files, traversal and admin-only files', function () {
@@ -42,7 +36,7 @@ describe('download', function () {
         asUser('alice')->get('/files/download?path=TV/nope.mp4', ['Accept' => 'application/json'])->assertNotFound();
         asUser('alice')->get('/files/download?path=../../etc/passwd', ['Accept' => 'application/json'])->assertStatus(400);
         asUser('alice')->get('/files/download?path=Torrent%20Downloads/secret.mp4', ['Accept' => 'application/json'])->assertForbidden();
-        asUser('richard')->get('/files/download?path=Torrent%20Downloads/secret.mp4')->assertOk();
+        asUser('richard')->get('/files/download?path=Torrent%20Downloads/secret.mp4')->assertStatus(302);
         expect(activityLog($this->base))->toHaveCount(1);
     });
 });
@@ -90,51 +84,54 @@ describe('file-link logging', function () {
     });
 });
 
-describe('cast and public links', function () {
-    it('gives a signed stream link for streamable files', function () {
-        $url = asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/ep1.mp4')
+describe('cast links', function () {
+    it('makes a random folder with a symlink to the file, served at /shared/', function () {
+        $response = asUser('alice')->getJson('/files/cast?path='.rawurlencode('TV/Drama/Show/Odd #1 & 50% + x.mp4'))
             ->assertOk()
-            ->assertJsonPath('streamable', true)
-            ->json('url');
+            ->assertJsonPath('streamable', true);
 
-        expect($url)->toContain('/public/stream?')->toContain('signature=');
+        $url = $response->json('url');
+        expect($url)->toMatch('#^/shared/[0-9a-f]{32}/Odd%20%231%20%26%2050%25%20%2B%20x\.mp4$#')
+            ->and($response->json('expires'))->toBeGreaterThan(time() + 23 * 3600);
 
-        // no REMOTE_USER: the Chromecast isn't logged in
-        $this->get($url)
-            ->assertOk()
-            ->assertHeader('X-Sendfile', "{$this->show}/ep1.mp4")
-            ->assertHeader('Content-Type', 'video/mp4');
+        $token = explode('/', $url)[2];
+        $link = "{$this->base}/public-cast/{$token}/Odd #1 & 50% + x.mp4";
+        expect(is_link($link))->toBeTrue()
+            ->and(readlink($link))->toBe("{$this->show}/Odd #1 & 50% + x.mp4");
 
-        expect(end(...[activityLog($this->base)]))->toContain(' : stream : public : ');
+        expect(end(...[activityLog($this->base)]))->toContain(' : stream : alice : ');
     });
 
-    it('gives a signed download link for files that cannot stream', function () {
-        $url = asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/pilot.avi')
+    it('gives a download link for files that cannot stream', function () {
+        asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/pilot.avi')
             ->assertJsonPath('streamable', false)
-            ->json('url');
-
-        expect($url)->toContain('/public/download?');
-        $this->get($url)->assertOk();
+            ->assertJsonPath('url', fn (string $url) => str_ends_with($url, '/pilot.avi?download'));
     });
 
-    it('rejects tampered, unsigned and expired links', function () {
-        $url = asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/ep1.mp4')->json('url');
+    it('uses a new unguessable folder each time', function () {
+        $a = asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/ep1.mp4')->json('url');
+        $b = asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/ep1.mp4')->json('url');
 
-        $this->get(str_replace('ep1.mp4', 'ep2.mkv', $url))->assertForbidden();
-        $this->get('/public/stream?path=TV/Drama/Show/ep1.mp4')->assertForbidden();
-
-        $this->travel(25)->hours();
-        $this->get($url)->assertForbidden();
+        expect($a)->not->toBe($b);
     });
 
-    it('works through the /api alias Apache uses', function () {
-        $alias = ['SCRIPT_NAME' => '/api/index.php', 'SCRIPT_FILENAME' => base_path('public/index.php'), 'PHP_SELF' => '/api/index.php'];
+    it('removes expired link folders but never real files or other folders', function () {
+        $root = "{$this->base}/public-cast";
+        asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/ep1.mp4');
+        $old = glob("$root/*")[0];
+        touch($old, time() - 25 * 3600);
+        mkdir("$root/not-a-token");
+        touch("$root/not-a-token", time() - 25 * 3600);
 
-        $url = $this->withServerVariables($alias + ['REMOTE_USER' => 'alice'])
-            ->getJson('/api/files/cast?path='.rawurlencode('TV/Drama/Show/Odd #1 & 50% + x.mp4'))
-            ->json('url');
-        expect($url)->toContain('/api/public/stream?');
+        asUser('alice')->getJson('/files/cast?path=TV/Drama/Show/ep2.mkv');
 
-        $this->withServerVariables($alias)->get($url)->assertOk(); // replaces REMOTE_USER: not logged in
+        expect(is_dir($old))->toBeFalse()
+            ->and(is_dir("$root/not-a-token"))->toBeTrue()
+            ->and(is_file("{$this->show}/ep1.mp4"))->toBeTrue()
+            ->and(glob("$root/*"))->toHaveCount(2);
+    });
+
+    it('refuses admin-only files to other users', function () {
+        asUser('alice')->getJson('/files/cast?path=Torrent%20Downloads/secret.mp4')->assertForbidden();
     });
 });

@@ -12,7 +12,7 @@
 # When the site moves to media.aspdendev.com, change both ServerName lines,
 # the certificate paths and APP_URL in media-api/.env.
 #
-# Modules: php8.4, rewrite, authz_groupfile, xsendfile, proxy, proxy_http,
+# Modules: php8.4, rewrite, authz_groupfile, proxy, proxy_http,
 #          headers, ssl.
 
 <VirtualHost *:80>
@@ -64,23 +64,18 @@
         RewriteRule ^ index.php [L]
     </Directory>
 
-    # Signed, unauthenticated links for Chromecast (Phase 2). Matched on the
-    # ORIGINAL request line: after the rewrite to index.php Apache re-checks
-    # auth against the new URI, where a <Location /api/public> would not apply.
-    <If "%{THE_REQUEST} =~ m#^[A-Z]+ /api/public/#">
-        Require all granted
-    </If>
-
-    # Laravel sends X-Sendfile; Apache streams the file and handles Range
-    # (PHP can't on this 32-bit system for files over 2 GB).
-    XSendFile On
-    XSendFilePath /home/share/
-
-    # --- Direct media links -------------------------------------------------
+    # --- Media files: always served by Apache, never by PHP -------------------
+    # (PHP is 32-bit here and can't handle files over 2 GB; mod_xsendfile fails
+    # with "unable to stat file" on these drives.) Apache handles Range/seeking.
     Alias /media/ "/home/share/"
     <Directory /home/share/>
         Options FollowSymLinks
         AllowOverride None
+        # /api/files/download logs the download, then redirects here with
+        # ?download, which makes the browser save the file instead of playing it
+        <If "%{QUERY_STRING} =~ /(^|&)download(=|&|$)/">
+            Header set Content-Disposition "attachment"
+        </If>
     </Directory>
     # Restricted library folders: admins only, also for direct links
     <LocationMatch "^/media/Video/(Torrent Downloads|Uploaded Files)(/|$)">
@@ -95,6 +90,22 @@
     </Directory>
     <Location /public/>
         Require group admin
+    </Location>
+
+    # --- Chromecast links: no login ------------------------------------------
+    # /api/files/cast makes /home/public/cast/<32 random hex>/<file> -> real
+    # file; the random folder name is the secret. No directory listing (no
+    # Indexes), so tokens can't be discovered. Removed after 24 hours.
+    Alias /shared/ "/home/public/cast/"
+    <Directory "/home/public/cast/">
+        Options FollowSymLinks
+        AllowOverride None
+        <If "%{QUERY_STRING} =~ /(^|&)download(=|&|$)/">
+            Header set Content-Disposition "attachment"
+        </If>
+    </Directory>
+    <Location /shared/>
+        Require all granted
     </Location>
 
     # --- Live TV: HLS from the tuner box (admins only) -----------------------

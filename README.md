@@ -37,7 +37,9 @@ MEDIA_DEV_USER=richard
 MEDIA_DEV_ROLES=admin,ftp,standard
 ```
 
-`php artisan serve` → `curl localhost:8000/me`. (Routes have no `/api` prefix: in production Apache serves the app under `Alias /api`; in development the Vite dev server proxies `/api/*` to `localhost:8000/*`.) The dev login only works
+`php artisan serve` → `curl localhost:8000/me`. For playing and downloading
+files locally also run `php -S 127.0.0.1:8001 dev/static-server.php`, which
+stands in for Apache's `/media` and `/shared`. (Routes have no `/api` prefix: in production Apache serves the app under `Alias /api`; in development the Vite dev server proxies `/api/*` to `localhost:8000/*`.) The dev login only works
 with `APP_ENV=local`, `MEDIA_DEV_AUTH=true` **and** a request from localhost.
 
 ## Tests
@@ -60,6 +62,9 @@ with `APP_ENV=local`, `MEDIA_DEV_AUTH=true` **and** a request from localhost.
 
 ## Server facts
 
-media02: Raspberry Pi, PHP 8.4 **32-bit**, mod_php, mod_xsendfile. PHP can't
-size or stream files over 2 GB on 32-bit, so file sizes come from `stat` and
-all file delivery goes through X-Sendfile.
+media02: Raspberry Pi, PHP 8.4 **32-bit**, mod_php. PHP can't size or stream
+files over 2 GB on 32-bit, so sizes come from `find`/`stat`, and **PHP never
+sends media**: downloads redirect to Apache's `/media/…?download`, and
+Chromecast links are symlink folders Apache serves at `/shared/…`.
+(mod_xsendfile is not used: it fails with "unable to stat file" on media02's
+drives.)

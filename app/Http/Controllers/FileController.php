@@ -4,16 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Auth\MediaUser;
 use App\Library\ActivityLogger;
+use App\Library\CastLinks;
 use App\Library\FileInspector;
-use App\Library\FileSender;
 use App\Library\FileType;
 use App\Library\LibraryService;
 use App\Support\Paths\MediaPath;
 use App\Support\Paths\MediaPathResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\URL;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 /**
  * One library file: info, play, download, cast.
@@ -80,35 +79,40 @@ class FileController extends Controller
         ]);
     }
 
-    public function download(Request $request, MediaUser $user, FileSender $sender): Response
+    /**
+     * Logs the download, then sends the browser to the file's own /media URL
+     * with ?download, where Apache serves it as an attachment (vhost rule).
+     * Apache does the transfer: no PHP or X-Sendfile involved.
+     */
+    public function download(Request $request, MediaUser $user): RedirectResponse
     {
         $file = $this->file($request, $user);
         $this->activity->fileAction(ActivityLogger::DOWNLOAD, $user->username, $file->absolute());
 
-        return $sender->send($file->absolute(), $this->inspector->mimeType($file->absolute()), 'attachment');
+        // Relative Location on purpose: redirect() would prefix the /api base.
+        return new RedirectResponse(self::mediaUrl($file).'?download', 302);
     }
 
     /**
-     * Links a Chromecast can open without Basic auth. Files browsers can't
-     * stream (DivX AVI, WMV) get a download link instead, as on the old site.
+     * A link a Chromecast can open without Basic auth (see CastLinks).
+     * Files browsers can't stream (DivX AVI, WMV) get a download link
+     * instead, as on the old site.
      */
-    public function cast(Request $request, MediaUser $user): JsonResponse
+    public function cast(Request $request, MediaUser $user, CastLinks $links): JsonResponse
     {
         $file = $this->file($request, $user);
         $mime = $this->inspector->mimeType($file->absolute());
         $streamable = $this->inspector->isStreamable($mime);
-        $expires = now()->addHours(config('media.signed_url_ttl_hours'));
+
+        $link = $links->create($file, download: ! $streamable);
+        $this->activity->fileAction($streamable ? ActivityLogger::STREAM : ActivityLogger::DOWNLOAD, $user->username, $file->absolute());
 
         return response()->json([
             'name' => $file->name(),
             'mime' => $mime,
             'streamable' => $streamable,
-            'url' => URL::temporarySignedRoute(
-                $streamable ? 'public.stream' : 'public.download',
-                $expires,
-                ['path' => $file->relative],
-            ),
-            'expires' => $expires->getTimestamp(),
+            'url' => $link['url'],
+            'expires' => $link['expires'],
         ]);
     }
 

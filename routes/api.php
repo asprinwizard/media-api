@@ -4,7 +4,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\MeController;
-use App\Http\Controllers\PublicMediaController;
 use App\Http\Controllers\SearchController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,14 +30,4 @@ Route::middleware(['media.user', 'same-origin'])->group(function () {
         Route::get('/cast', 'cast');
         Route::post('/link', 'logLink');
     });
-});
-
-/*
-| Unauthenticated, signed links for Chromecast: /api/public/* in the browser.
-| Apache lets these through without Basic auth (see deploy/ vhost); the
-| `signed` middleware checks signature and expiry.
-*/
-Route::middleware('signed')->prefix('public')->name('public.')->controller(PublicMediaController::class)->group(function () {
-    Route::get('/stream', 'stream')->name('stream');
-    Route::get('/download', 'download')->name('download');
 });
