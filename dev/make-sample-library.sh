@@ -69,7 +69,7 @@ printf 'admin: richard\nftp: richard bob\nstandard: alice bob richard\n' > htgro
 mkdir -p public/get_iplayer logs/get_iplayer logs/yt-dlp private/youtube
 dl="$ROOT/upload/get_iplayer"
 dd if=/dev/zero of="$dl/Harbour_Lights____s02e05_-_Undertow---m002x4kq.mp4" bs=1024 count=900 2>/dev/null
-dd if=/dev/zero of="$dl/Harbour_Lights____s02e05_-_Undertow_(SD)---m002x4kq.video.m4v" bs=1024 count=120 2>/dev/null
+dd if=/dev/zero of="$dl/Harbour_Lights____s02e05_-_Undertow_(SD)---m002x4kq.video.ts" bs=1024 count=120 2>/dev/null
 dd if=/dev/zero of="$dl/Wild_Isles____s01e04_-_Moorland---m001xq2d.partial.mp4" bs=1024 count=300 2>/dev/null
 touch -d '3 hours ago' "$dl/Wild_Isles____s01e04_-_Moorland---m001xq2d.partial.mp4"
 mkdir -p public/get_iplayer/m002x4kq
@@ -103,10 +103,15 @@ OUT
     for pid in \$(echo "\$2" | tr ',' ' '); do
       base="\$DL/Wild_Isles____s01e05_-_Episode\${sd}---\$pid"
       echo "INFO: Downloading \$pid"
-      for i in 1 2 3 4 5 6 7 8; do dd if=/dev/zero bs=1024 count=200 2>/dev/null >> "\$base.video.m4v"; sleep 1; done
-      dd if=/dev/zero of="\$base.audio.m4a" bs=1024 count=100 2>/dev/null; sleep 2
-      mv "\$base.video.m4v" "\$base.partial.mp4"; rm -f "\$base.audio.m4a"; sleep 3
-      mv "\$base.partial.mp4" "\$base.mp4"
+      # The stages a real get_iplayer 3.36 download goes through (Nov 2026):
+      # download, convert (then a pause while ffmpeg rewrites), tag, done.
+      for i in 1 2 3 4 5 6 7 8; do dd if=/dev/zero bs=1024 count=250 2>/dev/null >> "\$base.video.ts"; echo seg > "\$base.video.txt"; sleep 1; done
+      mv "\$base.video.ts" "\$base.hls.ts"; rm -f "\$base.video.txt"
+      for i in 1 2 3 4; do dd if=/dev/zero bs=1024 count=480 2>/dev/null >> "\$base.partial.mp4"; sleep 1; done
+      for i in \$(seq 1 20); do touch "\$base.partial.mp4"; sleep 1; done
+      mv "\$base.partial.mp4" "\$base.mp4"; rm -f "\$base.hls.ts"; echo jpg > "\$base.jpg"
+      for i in 1 2 3 4; do dd if=/dev/zero bs=1024 count=480 2>/dev/null >> "\$base-temp-99.mp4"; sleep 1; done
+      mv "\$base-temp-99.mp4" "\$base.mp4"; rm -f "\$base.jpg"
       echo "INFO: Recorded \$base.mp4"
     done
     ;;

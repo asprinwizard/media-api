@@ -132,8 +132,10 @@ return [
             'info' => env('MEDIA_IPLAYER_LOG_DIR', env('MEDIA_LOG_DIR', '/var/log').'/get_iplayer').'/get_iplayer_file_info.log',
         ],
         'search_timeout' => (int) env('MEDIA_IPLAYER_SEARCH_TIMEOUT', 300),
-        // "SD copy": a second, lower-quality download kept alongside (… (SD)---pid.mp4)
-        'sd_copy_args' => ['--force', '--ffmpeg-force', '--fileprefix=<nameshort>____<senum>< - episodeshort> (SD)<---pid>', '--modes=better'],
+        // "SD copy": a second, standard-definition download kept alongside
+        // (… (SD)---pid.mp4). get_iplayer 3.x takes --quality (fhd, hd, sd,
+        // web, mobile); the old --modes option is refused.
+        'sd_copy_args' => ['--force', '--ffmpeg-force', '--fileprefix=<nameshort>____<senum>< - episodeshort> (SD)<---pid>', '--quality='.env('MEDIA_IPLAYER_SD_QUALITY', 'sd')],
     ],
 
     // YouTube (admin), via yt-dlp.

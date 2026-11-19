@@ -4,6 +4,7 @@ namespace App\Acquire\Iplayer;
 
 use App\Library\DirectoryReader;
 use App\Support\Shell\LocalShell;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * BBC iPlayer via get-iplayer (port of lib/Iplayer.php).
@@ -19,6 +20,9 @@ class IplayerService
 
     /** A download whose files haven't changed for this long is reported as stalled. */
     private const STALLED_AFTER = 1800;
+
+    /** Seconds a converting file must stay the same size to count as finishing. */
+    private const FINISHING_AFTER = 15;
 
     /** Re-try a failed info lookup after this long. */
     private const INFO_RETRY_AFTER = 900;
@@ -169,19 +173,24 @@ class IplayerService
                 if ($track === null) {
                     continue;
                 }
-                // A file that's being downloaded or encoded changes constantly,
+                // A file that's being downloaded or converted changes constantly,
                 // so one untouched for a long while has been abandoned.
                 $stalled = $track['status'] !== IplayerStatusResolver::COMPLETED
                     && $now - $track['mtime'] > self::STALLED_AFTER;
-                $inProgress = $track['status'] !== IplayerStatusResolver::COMPLETED && ! $stalled;
-                $active = $active || $inProgress;
+                $status = $stalled ? 'stalled' : $this->finishing($track, $now);
+                $active = $active || ($status !== IplayerStatusResolver::COMPLETED && ! $stalled);
                 $tracks[$kind] = [
-                    'status' => $stalled ? 'stalled' : $track['status'],
-                    'label' => $stalled ? 'Stopped (no progress for a while)' : IplayerStatusResolver::LABELS[$track['status']],
+                    'status' => $status,
+                    'label' => $stalled ? 'Stopped (no progress for a while)' : IplayerStatusResolver::LABELS[$status],
                     'file' => $track['file'],
                     'size' => $track['size'],
-                    // As before: no expected size while only the audio is downloading.
-                    'expectedSize' => $track['status'] !== IplayerStatusResolver::AUDIO ? $info?->expectedSize($kind === 'sd') : null,
+                    'expectedSize' => match ($status) {
+                        // BBC's estimate for the quality being fetched
+                        IplayerStatusResolver::DOWNLOADING => $info?->expectedSize($kind === 'sd'),
+                        // the file being converted or copied from (the MP4 ends up ~3% smaller)
+                        IplayerStatusResolver::CONVERTING, IplayerStatusResolver::TAGGING => $track['basis'],
+                        default => null,
+                    },
                     'updated' => $track['mtime'],
                 ];
             }
@@ -190,6 +199,32 @@ class IplayerService
         }
 
         return ['active' => $active, 'queue' => $queue, 'items' => $items];
+    }
+
+    /**
+     * After converting, ffmpeg rewrites the whole .partial.mp4 in place to
+     * put its index at the front: the file keeps changing but stops growing,
+     * for a few minutes on media02. Spot that by remembering each file's size
+     * between status checks.
+     *
+     * @param  array{status: string, file: string, size: ?float, mtime: int}  $track
+     */
+    private function finishing(array $track, int $now): string
+    {
+        if ($track['status'] !== IplayerStatusResolver::CONVERTING || ! str_ends_with($track['file'], '.partial.mp4') || ! $track['size']) {
+            return $track['status'];
+        }
+        $key = 'iplayer:growth:'.md5($track['file']);
+        $seen = Cache::get($key);
+        if (! is_array($seen) || abs($seen['size'] - $track['size']) >= 0.5) {
+            Cache::put($key, ['size' => $track['size'], 'since' => $now], 3600);
+
+            return $track['status'];
+        }
+
+        return $now - $seen['since'] >= self::FINISHING_AFTER && $now - $track['mtime'] < 60
+            ? IplayerStatusResolver::FINISHING
+            : $track['status'];
     }
 
     /**
@@ -267,7 +302,7 @@ class IplayerService
         @touch($marker);
 
         // Write to a temp file and only keep a non-empty result.
-        $script = '"$@" > "$0.tmp" 2>/dev/null; if [ -s "$0.tmp" ] && grep -q "^title:" "$0.tmp"; then mv "$0.tmp" "$0"; else rm -f "$0.tmp"; fi';
+        $script = '"$@" > "$0.tmp" 2>/dev/null; if [ -s "$0.tmp" ] && grep -q "^title:" "$0.tmp"; then mv "$0.tmp" "$0"; rm -f "$0.fetching"; else rm -f "$0.tmp"; fi';
         $this->shell->background(['sh', '-c', $script, $file, ...$this->command, '--info', '--pid', $pid], $this->logs['info']);
 
         return true;

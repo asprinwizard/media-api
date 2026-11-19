@@ -1,0 +1,75 @@
+get_iplayer v3.36
+  Copyright (C) 2008-2010 Phil Lewis, 2010- get_iplayer contributors
+  This program comes with ABSOLUTELY NO WARRANTY; for details use --warranty.
+  This is free software, and you are welcome to redistribute it under certain
+  conditions; use --conditions for details.
+
+
+Episodes:
+In the Night Garden: Series 1 - The Pontipines on the Ninky Nonk, CBeebies, b00796ry
+INFO: 1 total programmes
+
+
+brand:           In the Night Garden
+categories:      Children's,Entertainment & Comedy
+category:        Children's
+channel:         CBeebies
+credits:         /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.credits.txt
+cuesheet:        /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.cue
+desc:            Everyone goes for a ride on the Ninky Nonk, but the teeny-tiny Pontipines are left behind.
+desclong:        Everyone goes for a ride on the Ninky Nonk, but the teeny-tiny Pontipines are left behind. They chase the Ninky Nonk around the garden until they finally catch it and secretly ride in their own special carriage.
+descmedium:      Children's programme. Everyone goes for a ride on the Ninky Nonk but the Pontipines are left behind, so they chase after it all around the garden.
+descshort:       Everyone goes for a ride on the Ninky Nonk, but the teeny-tiny Pontipines are left behind.
+dir:             /home/ftp/media/get_iplayer
+dldate:          2026-11-19
+dltime:          20:36:59
+duration:        900
+durations:       original: 900
+episode:         34. The Pontipines on the Ninky Nonk
+episodenum:      34
+episodeshort:    The Pontipines on the Ninky Nonk
+expires:         in 4y 99 days 9 hours (2031-02-27T06:00:00+00:00)
+ext:             EXT
+filename:        /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.EXT
+filepart:        /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.partial.EXT
+fileprefix:      In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry
+firstbcast:      2007-04-05T11:00:00+01:00
+firstbcastdate:  2007-04-05
+firstbcastday:   05
+firstbcastmonth: 04
+firstbcastrel:   19 years 228 days 10 hours ago
+firstbcasttime:  11:00:00
+firstbcastyear:  2007
+index:           1
+longname:        In the Night Garden: Series 1
+name:            In the Night Garden: Series 1
+nameshort:       In the Night Garden
+pid:             b00796ry
+player:          https://www.bbc.co.uk/iplayer/episode/b00796ry
+qualities:       original: fhd,hd,sd,web,mobile
+qualitysizes:    original: fhd=1819MB,hd=1070MB,sd=594MB,web=331MB,mobile=92MB [estimated sizes]
+releaseyear:     2007
+runtime:         15
+sebcast:         200704051100
+sebcastdate:     20070405
+sebcasttime:     1100
+senum:           s01e34
+senumx:          01x34
+series:          Series 1
+seriesnum:       1
+seriessort:      Series 1
+sesort:          s01e34
+sesortx:         01x34
+subsfile:        /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.srt
+subspart:        /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.partial.srt
+subsraw:         /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.ttml
+thumbfile:       /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.jpg
+thumbnail:       https://ichef.bbci.co.uk/images/ic/1920x1080/p07tcx4r.jpg
+title:           In the Night Garden: Series 1: The Pontipines on the Ninky Nonk
+tracklist:       /home/ftp/media/get_iplayer/In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.tracks.txt
+type:            tv
+verpids:         original: b0071vpt
+version:         original
+versions:        original
+web:             https://www.bbc.co.uk/programmes/b00796ry
+

@@ -24,6 +24,13 @@ describe('search output', function () {
             ->and($results[2]['pid'])->toBe('m0025abc');
     });
 
+    it('reads real get_iplayer 3.36 output', function () {
+        $results = IplayerService::parseSearch(file_get_contents(base_path('tests/fixtures/iplayer/search-real.txt')));
+        expect($results)->toHaveCount(7)
+            ->and($results[0])->toBe(['index' => '268', 'label' => 'BBC London: Evening News - 21/10/2026, BBC One, m00334px', 'pid' => 'm00334px'])
+            ->and($results[6]['pid'])->toBe('m0034ggg');
+    });
+
     it('returns nothing when there are no matches', function () {
         expect(IplayerService::parseSearch("get_iplayer v3.35\n\nMatches:\n\nINFO: 0 matching programmes\n"))->toBe([]);
     });
@@ -43,13 +50,20 @@ describe('fileinfo', function () {
     it('gives the title and the best expected size', function () {
         $info = IplayerInfo::parse(file_get_contents(base_path('tests/fixtures/iplayer/fileinfo.txt')));
         expect($info->title())->toBe('Doctor Who: Series 14 - 1. Space Babies')
-            ->and($info->expectedSize())->toBe(1823.0 * 1024 * 1024);
+            ->and($info->expectedSize())->toBe(1823.0e6);
+    });
+
+    it('reads a real fileinfo, with the SD size for SD copies', function () {
+        $info = IplayerInfo::parse(file_get_contents(base_path('tests/fixtures/iplayer/fileinfo-real.txt')));
+        expect($info->title())->toBe('In the Night Garden: Series 1: The Pontipines on the Ninky Nonk')
+            ->and($info->expectedSize())->toBe(1819.0e6)
+            ->and($info->expectedSize(sdCopy: true))->toBe(594.0e6);
     });
 
     it('falls back down the mode order and copes with modesizes', function () {
-        expect(IplayerInfo::parse("qualitysizes:  original: sd=640MB,web=401MB\n")->expectedSize())->toBe(640.0 * 1024 * 1024)
-            ->and(IplayerInfo::parse("modesizes:  hd=1.5GB,sd=600MB\n")->expectedSize())->toBe(1.5 * 1024 ** 3)
-            ->and(IplayerInfo::parse("qualitysizes:  original: fhd=2GB,sd=640MB\n")->expectedSize(sdCopy: true))->toBe(640.0 * 1024 * 1024)
+        expect(IplayerInfo::parse("qualitysizes:  original: sd=640MB,web=401MB\n")->expectedSize())->toBe(640.0e6)
+            ->and(IplayerInfo::parse("modesizes:  hd=1.5GB,sd=600MB\n")->expectedSize())->toBe(1.5e9)
+            ->and(IplayerInfo::parse("qualitysizes:  original: fhd=2GB,sd=640MB\n")->expectedSize(sdCopy: true))->toBe(640.0e6)
             ->and(IplayerInfo::parse("title: x\n")->expectedSize())->toBeNull()
             ->and(IplayerInfo::parse('')->title())->toBeNull();
     });
@@ -61,37 +75,49 @@ describe('status resolver', function () {
         expect(R::resolve([new DirectoryEntry('Show---m001z3k1', FileType::Folder, null, 1)]))->toBe([]);
     });
 
-    it('reports each stage of the main download', function (array $files, string $status, string $file) {
+    // The sequence a real download went through on media02 (get_iplayer 3.36, Nov 2026).
+    it('follows a real download through each stage', function (array $files, string $status, string $file, ?float $basis) {
         $items = R::resolve(ipFiles($files));
         expect($items)->toHaveCount(1)
-            ->and($items[0]['pid'])->toBe('m001z3k1')
+            ->and($items[0]['pid'])->toBe('b00796ry')
             ->and($items[0]['main']['status'])->toBe($status)
             ->and($items[0]['main']['file'])->toBe($file)
+            ->and($items[0]['main']['basis'])->toBe($basis)
             ->and($items[0]['sd'])->toBeNull()
-            ->and($items[0]['nameTitle'])->toBe('Doctor Who s14e01 - Space Babies');
+            ->and($items[0]['nameTitle'])->toBe('In the Night Garden s01e34 - The Pontipines on the Ninky Nonk');
     })->with([
-        'video' => [['Doctor_Who____s14e01_-_Space_Babies---m001z3k1.video.m4v' => [500]], R::VIDEO, 'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.video.m4v'],
-        'hls video' => [['Doctor_Who____s14e01_-_Space_Babies---m001z3k1.hls.ts' => [500]], R::VIDEO, 'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.hls.ts'],
-        'audio beats video' => [[
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.video.ts' => [900],
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.audio.ts' => [20],
-        ], R::AUDIO, 'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.audio.ts'],
+        'downloading' => [[
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.video.ts' => [1313753024],
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.video.txt' => [5614],
+        ], R::DOWNLOADING, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.video.ts', null],
+        'renamed, about to convert' => [[
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.hls.ts' => [1807674144],
+        ], R::CONVERTING, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.hls.ts', 1807674144.0],
         'converting' => [[
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.dash.ts' => [900],
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.audio.m4a' => [20],
-        ], R::ENCODING, 'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.dash.ts'],
-        'encoding' => [[
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.partial.mp4' => [300],
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.video.m4v' => [900],
-        ], R::ENCODING, 'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.partial.mp4'],
-        'temp beats everything' => [[
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.mp4' => [900],
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1-temp.mp4' => [100],
-        ], R::TEMP, 'Doctor_Who____s14e01_-_Space_Babies---m001z3k1-temp.mp4'],
-        'completed (subtitles ignored)' => [[
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.mp4' => [900],
-            'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.srt' => [9],
-        ], R::COMPLETED, 'Doctor_Who____s14e01_-_Space_Babies---m001z3k1.mp4'],
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.hls.ts' => [1807674144],
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.partial.mp4' => [940298240],
+        ], R::CONVERTING, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.partial.mp4', 1807674144.0],
+        'cover art saved' => [[
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.jpg' => [122880],
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4' => [1758921096],
+        ], R::TAGGING, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4', null],
+        'writing the tagged copy' => [[
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry-temp-61318.mp4' => [77352960],
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.jpg' => [589141],
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4' => [1758921096],
+        ], R::TAGGING, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry-temp-61318.mp4', 1758921096.0],
+        'completed' => [[
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4' => [1758921096],
+        ], R::COMPLETED, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4', null],
+    ]);
+
+    it('still recognises the older separate audio and video files', function (array $files, string $status) {
+        expect(R::resolve(ipFiles($files))[0]['main']['status'])->toBe($status);
+    })->with([
+        'video' => [['Show____s01e01_-_A---m001z3k1.video.m4v' => [500]], R::DOWNLOADING],
+        'audio beats video' => [['Show____s01e01_-_A---m001z3k1.video.m4v' => [900], 'Show____s01e01_-_A---m001z3k1.audio.m4a' => [20]], R::AUDIO],
+        'dash conversion' => [['Show____s01e01_-_A---m001z3k1.dash.ts' => [900], 'Show____s01e01_-_A---m001z3k1.audio.m4a' => [20]], R::CONVERTING],
+        'subtitles ignored' => [['Show____s01e01_-_A---m001z3k1.mp4' => [900], 'Show____s01e01_-_A---m001z3k1.srt' => [9]], R::COMPLETED],
     ]);
 
     it('tracks the SD copy separately from the main download', function () {
@@ -101,7 +127,7 @@ describe('status resolver', function () {
         ]));
         expect($items)->toHaveCount(1)
             ->and($items[0]['main']['status'])->toBe(R::COMPLETED)
-            ->and($items[0]['sd']['status'])->toBe(R::VIDEO)
+            ->and($items[0]['sd']['status'])->toBe(R::DOWNLOADING)
             ->and($items[0]['sd']['file'])->toBe('Doctor_Who____s14e01_-_Space_Babies_(SD)---m001z3k1.video.m4v')
             ->and($items[0]['nameTitle'])->toBe('Doctor Who s14e01 - Space Babies');
     });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Acquire\Iplayer\IplayerService;
 use App\Acquire\Youtube\YoutubeService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Process;
@@ -180,7 +181,7 @@ describe('iplayer', function () {
         $bin = escapeshellarg("{$this->base}/bin/get-iplayer");
         expect(file("{$this->base}/public/get_iplayer/download_queue", FILE_IGNORE_NEW_LINES))->toBe([
             "$bin '--pid' 'm001z3k1,m001z3k2'",
-            "$bin '--pid' 'm001z3k1,m001z3k2' '--force' '--ffmpeg-force' '--fileprefix=<nameshort>____<senum>< - episodeshort> (SD)<---pid>' '--modes=better'",
+            "$bin '--pid' 'm001z3k1,m001z3k2' '--force' '--ffmpeg-force' '--fileprefix=<nameshort>____<senum>< - episodeshort> (SD)<---pid>' '--quality=sd'",
             "$bin '--pid' 'b006m86d' '--force' '--ffmpeg-force' '--pid-recursive'",
         ]);
         Process::assertRan(fn ($p) => str_contains(is_array($p->command) ? implode(' ', $p->command) : $p->command, 'get_iplayer_download_queue'));
@@ -230,10 +231,41 @@ describe('iplayer', function () {
         $status = asUser('richard')->getJson('/iplayer/status')->assertOk()->json();
         expect($status['active'])->toBeTrue()
             ->and($status['items'][0]['pid'])->toBe('b0000002')
-            ->and($status['items'][0]['main']['status'])->toBe('video')
+            ->and($status['items'][0]['main']['status'])->toBe('downloading')
             ->and($status['items'][0]['title'])->toBe('Show s01e02 - Two')
             ->and($status['items'][1]['main']['status'])->toBe('stalled')
             ->and($status['items'][1]['sd']['status'])->toBe('completed');
+    });
+
+    it('measures conversion against the source, and spots the finishing pass', function () {
+        $dir = "{$this->base}/upload/get_iplayer";
+        $sized = function (string $file, int $bytes) {
+            $h = fopen($file, 'w');
+            ftruncate($h, $bytes);
+            fclose($h);
+        };
+        $sized("$dir/Show____s01e01_-_One---b0000001.hls.ts", 1800);
+        $sized("$dir/Show____s01e01_-_One---b0000001.partial.mp4", 1700);
+        mkdir("{$this->base}/public/get_iplayer/b0000001");
+        touch("{$this->base}/public/get_iplayer/b0000001/fileinfo.fetching");
+        $service = app(IplayerService::class);
+        $now = time();
+
+        $main = fn (int $at) => $service->status($at)['items'][0]['main'];
+        expect($main($now))->toMatchArray(['status' => 'converting', 'label' => 'Converting to MP4', 'size' => 1700.0, 'expectedSize' => 1800.0]);
+        // Same size 20 s later while ffmpeg is still writing: the finishing pass.
+        expect($main($now + 20))->toMatchArray(['status' => 'finishing', 'label' => 'Finishing the MP4', 'expectedSize' => null]);
+
+        // Growing again (a new conversion) resets it.
+        $sized("$dir/Show____s01e01_-_One---b0000001.partial.mp4", 1750);
+        expect($main($now + 22)['status'])->toBe('converting');
+
+        // Tagging: the temp copy is measured against the finished .mp4.
+        unlink("$dir/Show____s01e01_-_One---b0000001.partial.mp4");
+        unlink("$dir/Show____s01e01_-_One---b0000001.hls.ts");
+        $sized("$dir/Show____s01e01_-_One---b0000001.mp4", 1750);
+        $sized("$dir/Show____s01e01_-_One---b0000001-temp-123.mp4", 500);
+        expect($main($now + 30))->toMatchArray(['status' => 'tagging', 'label' => 'Adding tags and artwork', 'size' => 500.0, 'expectedSize' => 1750.0]);
     });
 });
 

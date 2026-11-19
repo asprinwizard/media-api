@@ -90,11 +90,13 @@ final class IplayerInfo
     /** "1234MB", "1.2 GB", "850kB", "123456" (bytes) → bytes. */
     public static function bytes(string $value): ?float
     {
-        if (! preg_match('/^\s*([\d.]+)\s*([kKmMgGtT]?)i?[bB]?\s*$/', $value, $m)) {
+        if (! preg_match('/^\s*([\d.]+)\s*([kKmMgGtT]?)(i?)[bB]?\s*$/', $value, $m)) {
             return null;
         }
         $power = ['' => 0, 'k' => 1, 'm' => 2, 'g' => 3, 't' => 4][strtolower($m[2])];
 
-        return (float) $m[1] * (1024 ** $power);
+        // get_iplayer's "MB" is decimal: a real 1819MB estimate arrived as
+        // 1,807,674,144 bytes. "MiB" and friends are binary.
+        return (float) $m[1] * (($m[3] === 'i' ? 1024 : 1000) ** $power);
     }
 }

@@ -1,0 +1,16 @@
+get_iplayer v3.36
+  Copyright (C) 2008-2010 Phil Lewis, 2010- get_iplayer contributors
+  This program comes with ABSOLUTELY NO WARRANTY; for details use --warranty.
+  This is free software, and you are welcome to redistribute it under certain
+  conditions; use --conditions for details.
+
+
+Matches:
+268:	BBC London: Evening News - 21/10/2026, BBC One, m00334px
+269:	BBC London: Evening News - 20/10/2026, BBC One, m00334rb
+270:	BBC London: Evening News - 22/10/2026, BBC One, m00334s5
+271:	BBC London: Evening News - 23/10/2026, BBC One, m00334sy
+7030:	Spotlight: Lunchtime News - 19/11/2026, BBC One, m0034g5b
+7031:	Spotlight: Lunchtime News - 16/11/2026, BBC One, m0034gdx
+7032:	Spotlight: Lunchtime News - 17/11/2026, BBC One, m0034ggg
+INFO: 2202 matching programmes
