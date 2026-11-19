@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Acquire\IplayerController;
+use App\Http\Controllers\Acquire\UploadController;
+use App\Http\Controllers\Acquire\YoutubeController;
 use App\Http\Controllers\Admin\FileOperationsController;
 use App\Http\Controllers\Admin\JobsController;
 use App\Http\Controllers\DashboardController;
@@ -31,6 +34,23 @@ Route::middleware(['media.user', 'same-origin'])->group(function () {
         Route::get('/download', 'download');
         Route::get('/cast', 'cast');
         Route::post('/link', 'logLink');
+    });
+
+    Route::middleware('role:admin,ftp')->controller(UploadController::class)->group(function () {
+        Route::get('/uploads', 'index');
+        Route::post('/uploads', 'store');
+    });
+
+    Route::middleware('role:admin')->prefix('iplayer')->controller(IplayerController::class)->group(function () {
+        Route::get('/search', 'search');
+        Route::post('/downloads', 'download');
+        Route::get('/status', 'status');
+    });
+
+    Route::middleware('role:admin')->prefix('youtube')->controller(YoutubeController::class)->group(function () {
+        Route::get('/info', 'info');
+        Route::post('/downloads', 'download');
+        Route::get('/status', 'status');
     });
 
     Route::middleware('role:admin')->prefix('admin')->controller(FileOperationsController::class)->group(function () {

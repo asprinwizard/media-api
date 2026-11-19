@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Acquire\Iplayer\IplayerService;
+use App\Acquire\Youtube\YoutubeService;
 use App\Admin\Convert\CloudConvertConverter;
 use App\Admin\Convert\Converter;
 use App\Admin\CopyQueue;
@@ -62,6 +64,26 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(Converter::class, fn () => new CloudConvertConverter(
             config('services.cloudconvert.key'),
             config('services.sftp'),
+        ));
+
+        $this->app->bind(IplayerService::class, fn ($app) => new IplayerService(
+            $app->make(LocalShell::class),
+            $app->make(DirectoryReader::class),
+            array_values(config('media.iplayer.command')),
+            config('media.iplayer.download_dir'),
+            config('media.iplayer.public_dir'),
+            config('media.iplayer.queue_script'),
+            config('media.iplayer.logs'),
+            config('media.iplayer.sd_copy_args'),
+            config('media.iplayer.search_timeout'),
+        ));
+        $this->app->bind(YoutubeService::class, fn ($app) => new YoutubeService(
+            $app->make(LocalShell::class),
+            config('media.youtube.binary'),
+            config('media.youtube.cookies'),
+            config('media.youtube.download_dir'),
+            config('media.youtube.log'),
+            config('media.youtube.info_timeout'),
         ));
 
         $this->app->bind(CastLinks::class, fn () => new CastLinks(

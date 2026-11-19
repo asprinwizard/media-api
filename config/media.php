@@ -109,6 +109,34 @@ return [
         'timeout' => (int) env('MEDIA_EXTRACT_TIMEOUT', 3 * 3600),
     ],
 
+    // BBC iPlayer (admin). get-iplayer runs through sudo, as before; its own
+    // options file sets the output folder (download_dir) and filename format.
+    'iplayer' => [
+        'command' => array_filter(explode(' ', (string) env('MEDIA_IPLAYER_COMMAND', 'sudo get-iplayer'))),
+        'download_dir' => env('MEDIA_IPLAYER_DIR', env('MEDIA_UPLOAD_PATH', '/home/ftp/media').'/get_iplayer'),
+        // download_queue (+ _active while running) and <pid>/fileinfo, shared with the old site
+        'public_dir' => env('MEDIA_IPLAYER_PUBLIC', env('MEDIA_PUBLIC_PATH', '/home/public/media').'/get_iplayer'),
+        'queue_script' => base_path('scripts/get_iplayer_download_queue'),
+        'logs' => [
+            'search' => env('MEDIA_IPLAYER_LOG_DIR', env('MEDIA_LOG_DIR', '/var/log').'/get_iplayer').'/get_iplayer_search.log',
+            'download' => env('MEDIA_IPLAYER_LOG_DIR', env('MEDIA_LOG_DIR', '/var/log').'/get_iplayer').'/get_iplayer_download.log',
+            'info' => env('MEDIA_IPLAYER_LOG_DIR', env('MEDIA_LOG_DIR', '/var/log').'/get_iplayer').'/get_iplayer_file_info.log',
+        ],
+        'search_timeout' => (int) env('MEDIA_IPLAYER_SEARCH_TIMEOUT', 300),
+        // "SD copy": a second, lower-quality download kept alongside (… (SD)---pid.mp4)
+        'sd_copy_args' => ['--force', '--ffmpeg-force', '--fileprefix=<nameshort>____<senum>< - episodeshort> (SD)<---pid>', '--modes=better'],
+    ],
+
+    // YouTube (admin), via yt-dlp.
+    'youtube' => [
+        'binary' => env('MEDIA_YTDLP', 'yt-dlp'),
+        'cookies' => env('MEDIA_YOUTUBE_COOKIES', env('MEDIA_PRIVATE_PATH', '/home/private/media').'/youtube/cookies-youtube-com.txt'),
+        'download_dir' => env('MEDIA_YOUTUBE_DIR', env('MEDIA_UPLOAD_PATH', '/home/ftp/media').'/youtube'),
+        // Not the old site's log file: this one ends with a "finished" marker line.
+        'log' => env('MEDIA_YOUTUBE_LOG', env('MEDIA_LOG_DIR', '/var/log').'/yt-dlp/youtube_download.log'),
+        'info_timeout' => (int) env('MEDIA_YOUTUBE_INFO_TIMEOUT', 180),
+    ],
+
     'media01' => [
         'host' => env('MEDIA01_HOST', 'media01'),
         'user' => env('MEDIA01_USER', 'root'),

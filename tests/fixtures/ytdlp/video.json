@@ -1,0 +1,9 @@
+{"id":"dQw4w9WgXcQ","title":"Test Video","channel":"Test Channel","duration":212,"thumbnail":"https://i.ytimg.com/vi/x/hq.jpg",
+ "formats":[
+  {"format_id":"sb0","ext":"mhtml","vcodec":"none","acodec":"none","format_note":"storyboard"},
+  {"format_id":"140","ext":"m4a","vcodec":"none","acodec":"mp4a.40.2","tbr":129.5,"filesize":3433148,"format_note":"medium"},
+  {"format_id":"251","ext":"webm","vcodec":"none","acodec":"opus","tbr":135.1,"filesize_approx":3500000,"format_note":"medium"},
+  {"format_id":"18","ext":"mp4","vcodec":"avc1.42001E","acodec":"mp4a.40.2","height":360,"resolution":"640x360","fps":25,"tbr":500,"filesize":13000000,"format_note":"360p"},
+  {"format_id":"137","ext":"mp4","vcodec":"avc1.640028","acodec":"none","height":1080,"resolution":"1920x1080","fps":25,"tbr":4400,"filesize":110000000,"format_note":"1080p"},
+  {"format_id":"136","ext":"mp4","vcodec":"avc1.4d401f","acodec":"none","height":720,"resolution":"1280x720","fps":25,"tbr":2300,"format_note":"720p"}
+ ]}

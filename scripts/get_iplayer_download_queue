@@ -1,0 +1,52 @@
+#!/bin/sh
+# Runs queued get-iplayer downloads, one batch at a time.
+#
+# Usage: get_iplayer_download_queue [queue-file]
+#   (default /home/public/media/get_iplayer/download_queue)
+#
+# media-api appends lines to the queue file (each line is a fully quoted
+# command) while holding <queue>.lock. This script moves the queue to
+# <queue>_active under the same lock, runs it, deletes it, and repeats
+# until nothing is left. Only one copy runs at a time (<queue>.run lock);
+# a second start just exits, and the running copy picks up the new lines.
+#
+# An <queue>_active file left behind by a crash is run again first, as the
+# old script did (get-iplayer skips what it already has unless --force).
+
+QUEUE="${1:-/home/public/media/get_iplayer/download_queue}"
+ACTIVE="${QUEUE}_active"
+
+exec 8>"$QUEUE.run"
+if ! flock -n 8; then
+    echo "Queue runner already going; it will pick up new downloads."
+    exit 0
+fi
+
+while :; do
+    if [ ! -s "$ACTIVE" ]; then
+        # Swap the queue out under the writers' lock.
+        (
+            flock 9
+            if [ -s "$QUEUE" ]; then
+                mv "$QUEUE" "$ACTIVE"
+            fi
+        ) 9>"$QUEUE.lock"
+    fi
+
+    [ -s "$ACTIVE" ] || break
+
+    echo -----------------------------------------------------
+    echo "iPlayer download process started at $(date +"%F %T")"
+    echo -----------------------------------------------------
+    echo "The following tasks will take place:"
+    cat "$ACTIVE"
+    echo
+
+    bash "$ACTIVE"
+
+    rm -f "$ACTIVE"
+    echo =====================================================
+    echo "iPlayer download process completed at $(date +"%F %T")"
+    echo =====================================================
+    echo
+done
