@@ -36,6 +36,20 @@ mkdir -p upload/get_iplayer upload/youtube
 : > upload/wedding-ceremony.mp4
 
 mkdir -p public/admin public/logs private/search logs
+# Big alpha folder for the A–Z rail and type-to-jump
+for t in "Arrival Point" "Brass Harbour" "Cold Meridian" "Dune Road" "The Echo Chamber" "Fallow" "A Glass Garden" \
+         "Hollow Pines" "Iron Bay" "Juniper" "Kestrel" "Low Tide" "Marrow" "Night Ferry" "Orchard Lane" "Paper Moon" \
+         "Quarry" "Riverside" "Salt Marsh" "Tin Coast" "Umber" "Vale" "Westerly" "Yarrow" "Zephyr" "1984 Revisited"; do
+    mkdir -p "drives/hd02/Movies/$t"
+    : > "drives/hd02/Movies/$t/$t.mp4"
+done
+# Search index: one library-relative path per line (like media02's movies.db / tv.db)
+(cd share/Video && find -L Movies -mindepth 0 | sort) > private/search/movies.db
+(cd share/Video && find -L TV -mindepth 0 | sort) > private/search/tv.db
+# Home page log panels
+for n in 1 2 3; do echo "2026/11/18 21:0$n:12 [1234] >f+++++++++ TV/Drama/Harbour Lights/Series 2 (2025)/S02E0$n.mp4"; done > logs/media01-tv.log
+echo "2026/11/18 18:12:40 [999] >f+++++++++ Movies/The Lantern Keeper (2019)/The Lantern Keeper (2019).mp4" > logs/media01-movies.log
+ln -s "$ROOT/drives/hd02/Movies/Kestrel/missing.mp4" "drives/hd02/Movies/Kestrel/gone.mp4"
 printf 'admin: richard\nftp: richard bob\nstandard: alice bob richard\n' > htgroup
 
 echo "Sample library created in $ROOT"
@@ -49,4 +63,6 @@ MEDIA_PUBLIC_PATH=$ROOT/public
 MEDIA_PRIVATE_PATH=$ROOT/private
 MEDIA_LOG_DIR=$ROOT/logs
 MEDIA_ALLOWED_MOUNTS=$ROOT/drives/hd01,$ROOT/drives/hd02
+MEDIA_SEARCH_INDEX=$ROOT/private/search
+MEDIA_XSENDFILE=false
 EOF
