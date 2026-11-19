@@ -46,6 +46,34 @@ return [
         'Sport', 'Football', 'Rugby League', 'Cricket',
     ],
 
+    // Extensions by kind (port of media-web's FileFormat). Lower case.
+    'file_types' => [
+        'video' => ['avi', 'm2ts', 'mkv', 'mpg', 'mp4', 'mov', 'divx', 'wmv', 'flv', 'webm', 'm4v', 'ts'],
+        'audio' => ['mp3', 'wma', 'wav', 'ogg', 'm4a', 'aac'],
+        'subtitle' => ['idx', 'sub', 'srt'],
+        'compressed' => ['zip', 'gz', 'tar', 'rar'],
+    ],
+
+    // Browsers / Chromecast can't play these; cast links download instead.
+    'non_streamable_mime' => ['video/x-msvideo', 'video/x-ms-asf'],
+
+    // Pre-built search index: text files, one library-relative path per line.
+    'search_index' => env('MEDIA_SEARCH_INDEX', '/home/private/media/search'),
+    'search_limit' => (int) env('MEDIA_SEARCH_LIMIT', 1000),
+
+    // Serve files via Apache mod_xsendfile (production). Off in local dev,
+    // where `php artisan serve` streams the file itself instead.
+    'xsendfile' => (bool) env('MEDIA_XSENDFILE', true),
+
+    // Unauthenticated signed links (Chromecast) stay valid this long.
+    'signed_url_ttl_hours' => (int) env('MEDIA_SIGNED_URL_TTL_HOURS', 24),
+
+    // Logs shown to admins on the home page (files in paths.log_dir, .log).
+    'dashboard_logs' => [
+        'media01-tv' => 'TV',
+        'media01-movies' => 'Movies',
+    ],
+
     'media01' => [
         'host' => env('MEDIA01_HOST', 'media01'),
         'user' => env('MEDIA01_USER', 'root'),

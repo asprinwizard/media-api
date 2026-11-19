@@ -42,6 +42,19 @@ class MediaPathResolver
         return $mediaPath;
     }
 
+    /**
+     * A library path from a signed public link. The signature proves a user
+     * allowed to see the file created the link, so restricted folders are not
+     * re-checked; lexical and containment checks still apply.
+     */
+    public function librarySigned(string $path): MediaPath
+    {
+        $mediaPath = $this->make('library', $path);
+        $this->assertContained($mediaPath);
+
+        return $mediaPath;
+    }
+
     public function upload(string $path = ''): MediaPath
     {
         $mediaPath = $this->make('upload', $path);
