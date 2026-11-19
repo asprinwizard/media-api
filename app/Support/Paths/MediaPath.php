@@ -37,6 +37,9 @@ final readonly class MediaPath
             if ($segment === '..') {
                 throw InvalidMediaPath::badPath('contains ".."');
             }
+            if (str_starts_with($segment, '.')) {
+                throw InvalidMediaPath::hidden(); // hidden files and folders are never served
+            }
             $segments[] = $segment;
         }
 
@@ -51,6 +54,9 @@ final readonly class MediaPath
         if ($name === '' || $name === '.' || $name === '..'
             || str_contains($name, '/') || str_contains($name, '\\') || str_contains($name, "\0")) {
             throw InvalidMediaPath::badName($name);
+        }
+        if (str_starts_with($name, '.')) {
+            throw new InvalidMediaPath(400, "Names can't start with a dot: \"{$name}\" would be hidden.");
         }
     }
 

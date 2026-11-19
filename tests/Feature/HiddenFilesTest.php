@@ -44,3 +44,19 @@ it('leaves them out of latest files and the upload folder', function () {
     file_put_contents("$upload/film.mp4", 'x');
     expect(collect(asUser('richard')->getJson('/uploads')->json('items'))->pluck('name')->all())->toBe(['film.mp4']);
 });
+
+it('refuses direct requests for hidden files and folders', function () {
+    asUser('alice')->getJson('/library?path=TV/Shows/.@__thumb')->assertNotFound();
+    asUser('alice')->getJson('/files/info?path=TV/Shows/.DS_Store')->assertNotFound();
+    asUser('alice')->getJson('/files/play?path=TV/Shows/.@__thumb/hidden.mp4')->assertNotFound();
+    asUser('alice')->get('/files/download?path=TV/Shows/.@__thumb/hidden.mp4')->assertNotFound();
+    asUser('richard')->getJson('/admin/media01/library?path=TV/Shows/.@__thumb')->assertNotFound();
+    asUser('richard')->getJson('/admin/folders?server=media01&path=TV/Shows/.@__thumb')->assertNotFound();
+});
+
+it('refuses to create or rename things to hidden names', function () {
+    asUser('richard')->postJson('/admin/folders', ['server' => 'media02', 'path' => 'TV/Shows', 'name' => '.secret'])->assertStatus(400);
+    asUser('richard')->postJson('/admin/items/move', ['server' => 'media02', 'path' => 'TV/Shows', 'items' => [['name' => 'episode.mp4', 'newName' => '.episode.mp4']]])
+        ->assertOk()->assertJsonPath('results.0.ok', false);
+    expect(is_file("{$this->lib}/TV/Shows/episode.mp4"))->toBeTrue();
+});

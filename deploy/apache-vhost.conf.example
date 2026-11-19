@@ -87,6 +87,12 @@
         Require group admin
     </LocationMatch>
 
+    # Hidden files and folders (names starting with a dot) are never served.
+    # Comes after the rule above so it wins for admins too.
+    <LocationMatch "^/(media|shared)/(.*/)?\.">
+        Require all denied
+    </LocationMatch>
+
     # --- Queue files, activity logs, iPlayer info: admins only ---------------
     Alias /public/ "/home/public/media/"
     <Directory "/home/public/media/">

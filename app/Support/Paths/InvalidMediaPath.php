@@ -20,6 +20,12 @@ class InvalidMediaPath extends HttpException
         return new self(400, "\"{$name}\" isn't a valid file or folder name.");
     }
 
+    /** Hidden files and folders (names starting with a dot) don't exist as far as the site is concerned. */
+    public static function hidden(): self
+    {
+        return new self(404, 'Not found.');
+    }
+
     public static function forbidden(): self
     {
         return new self(403, 'You don\'t have access to this folder.');
