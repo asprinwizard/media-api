@@ -74,6 +74,15 @@ describe('upload', function () {
             ->assertStatus(409);
     });
 
+    it('saves a real (non-fake) uploaded file', function () {
+        $tmp = tempnam(sys_get_temp_dir(), 'up');
+        file_put_contents($tmp, str_repeat('x', 2048));
+        $file = new UploadedFile($tmp, 'real.mp4', 'video/mp4', null, true);
+
+        asUser('bob')->post('/uploads', ['file' => $file], ['X-Requested-With' => 'XMLHttpRequest'])->assertCreated();
+        expect(filesize("{$this->base}/upload/real.mp4"))->toBe(2048);
+    });
+
     it('strips paths from the client name and refuses hidden files', function () {
         asUser('bob')->post('/uploads', ['file' => UploadedFile::fake()->create('../../evil.mp4', 1)], ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertCreated()->assertJsonPath('name', 'evil.mp4');
@@ -141,6 +150,17 @@ describe('iplayer', function () {
             ->assertJsonPath('active', false)
             ->assertJsonPath('items.0.title', 'Doctor Who: Series 14 - 1. Space Babies')
             ->assertJsonPath('items.0.main.label', 'Completed');
+    });
+
+    it('reports an abandoned file as stalled even while the queue is busy', function () {
+        touch("{$this->base}/upload/get_iplayer/Old____s01e01_-_A---b0000009.partial.mp4", time() - 7200);
+        mkdir("{$this->base}/public/get_iplayer/b0000009");
+        touch("{$this->base}/public/get_iplayer/b0000009/fileinfo.fetching");
+        file_put_contents("{$this->base}/public/get_iplayer/download_queue_active", "get-iplayer --pid b0000010\n");
+
+        asUser('richard')->getJson('/iplayer/status')
+            ->assertJsonPath('active', true)
+            ->assertJsonPath('items.0.main.status', 'stalled');
     });
 
     it('reports in-progress, stalled and SD-copy tracks', function () {

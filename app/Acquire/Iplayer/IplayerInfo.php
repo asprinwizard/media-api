@@ -14,6 +14,9 @@ final class IplayerInfo
     /** Expected-size preference, best first (as before). */
     private const MODE_ORDER = ['fhd', 'hd', 'sd', 'web', 'mobile'];
 
+    /** For SD copies: the standard-definition size, then smaller ones. */
+    private const SD_MODE_ORDER = ['sd', 'web', 'mobile'];
+
     /**
      * @param  array<string, string|array<string, string>>  $fields
      */
@@ -48,9 +51,10 @@ final class IplayerInfo
 
     /**
      * Expected size in bytes of the best mode listed under qualitysizes/original
-     * (falling back to modesizes), or null when unknown.
+     * (falling back to modesizes), or null when unknown. $sdCopy picks the
+     * standard-definition size instead.
      */
-    public function expectedSize(): ?float
+    public function expectedSize(bool $sdCopy = false): ?float
     {
         // "qualitysizes: original: fhd=…" (as the old code read it), else
         // modesizes in either shape.
@@ -74,7 +78,7 @@ final class IplayerInfo
                 $sizes[strtolower(trim($mode))] = self::bytes($size);
             }
         }
-        foreach (self::MODE_ORDER as $mode) {
+        foreach ($sdCopy ? self::SD_MODE_ORDER : self::MODE_ORDER as $mode) {
             if (! empty($sizes[$mode])) {
                 return $sizes[$mode];
             }

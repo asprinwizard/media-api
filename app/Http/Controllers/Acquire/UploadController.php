@@ -64,6 +64,10 @@ class UploadController extends Controller
             return response()->json(['message' => "\"{$name}\" is already in the upload folder. Rename it and try again."], 409);
         }
 
+        // Read the size before moving (the temp file goes), and don't let a
+        // failed stat (files over 2 GB on 32-bit PHP) stop the upload.
+        $size = rescue(fn () => $file->getSize(), null, false);
+
         try {
             $file->move(dirname($target->absolute()), $name);
         } catch (\Throwable $e) {
@@ -73,7 +77,7 @@ class UploadController extends Controller
         }
         @chmod($target->absolute(), 0664);
 
-        Log::info('upload', ['user' => $user->username, 'file' => $name, 'size' => $file->getSize()]);
+        Log::info('upload', ['user' => $user->username, 'file' => $name, 'size' => $size]);
 
         return response()->json(['name' => $name], 201);
     }

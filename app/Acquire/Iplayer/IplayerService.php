@@ -163,15 +163,15 @@ class IplayerService
                 $fetches++;
             }
             $title = $info?->title() ?? $item['nameTitle'];
-            $expected = $info?->expectedSize();
 
             $tracks = [];
             foreach (['main' => $item['main'], 'sd' => $item['sd']] as $kind => $track) {
                 if ($track === null) {
                     continue;
                 }
+                // A file that's being downloaded or encoded changes constantly,
+                // so one untouched for a long while has been abandoned.
                 $stalled = $track['status'] !== IplayerStatusResolver::COMPLETED
-                    && ! $queueBusy
                     && $now - $track['mtime'] > self::STALLED_AFTER;
                 $inProgress = $track['status'] !== IplayerStatusResolver::COMPLETED && ! $stalled;
                 $active = $active || $inProgress;
@@ -181,7 +181,7 @@ class IplayerService
                     'file' => $track['file'],
                     'size' => $track['size'],
                     // As before: no expected size while only the audio is downloading.
-                    'expectedSize' => $kind === 'main' && $track['status'] !== IplayerStatusResolver::AUDIO ? $expected : null,
+                    'expectedSize' => $track['status'] !== IplayerStatusResolver::AUDIO ? $info?->expectedSize($kind === 'sd') : null,
                     'updated' => $track['mtime'],
                 ];
             }

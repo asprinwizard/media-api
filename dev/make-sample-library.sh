@@ -63,6 +63,83 @@ done
 (cd "share/Video/Uploaded Files/get_iplayer" && printf 'hello' > readme.txt && tar -czf extras.tar.gz readme.txt && rm readme.txt)
 printf 'admin: richard\nftp: richard bob\nstandard: alice bob richard\n' > htgroup
 
+# Phase 4: stand-ins for get-iplayer and yt-dlp that behave like the real
+# ones (output format, file names, gradual progress), plus some downloads
+# already in the get_iplayer folder at different stages.
+mkdir -p public/get_iplayer logs/get_iplayer logs/yt-dlp private/youtube
+dl="$ROOT/upload/get_iplayer"
+dd if=/dev/zero of="$dl/Harbour_Lights____s02e05_-_Undertow---m002x4kq.mp4" bs=1024 count=900 2>/dev/null
+dd if=/dev/zero of="$dl/Harbour_Lights____s02e05_-_Undertow_(SD)---m002x4kq.video.m4v" bs=1024 count=120 2>/dev/null
+dd if=/dev/zero of="$dl/Wild_Isles____s01e04_-_Moorland---m001xq2d.partial.mp4" bs=1024 count=300 2>/dev/null
+touch -d '3 hours ago' "$dl/Wild_Isles____s01e04_-_Moorland---m001xq2d.partial.mp4"
+mkdir -p public/get_iplayer/m002x4kq
+printf 'pid:             m002x4kq\nqualitysizes:    original: hd=1MB,sd=500kB\ntitle:           Harbour Lights: Series 2 - 5. Undertow\n' > public/get_iplayer/m002x4kq/fileinfo
+
+cat > bin/get-iplayer <<SH
+#!/bin/sh
+# Fake get-iplayer for development.
+DL="$dl"
+case "\$1" in
+  --)
+    sleep 1
+    cat <<OUT
+get_iplayer v3.35, Copyright (C) 2008-2010 Phil Lewis
+
+Matches:
+1201:	Wild Isles: Series 1 - 3. Cliffs, BBC Two, m001xq2c
+1202:	Wild Isles: Series 1 - 4. Moorland, BBC Two, m001xq2d
+1203:	Wild Isles: Series 1 - 5. Estuaries, BBC Two, m001xq2f
+1204:	Wild Isles of the North: Special, BBC Four, m001xq2g
+
+INFO: 4 matching programmes
+OUT
+    ;;
+  --info)
+    pid="\$3"
+    printf 'pid:             %s\nqualitysizes:    original: hd=2MB,sd=1MB\ntitle:           Wild Isles: Series 1 - %s\n' "\$pid" "\$pid"
+    ;;
+  --pid)
+    sd=""; case "\$*" in *"(SD)"*) sd="_(SD)";; esac
+    for pid in \$(echo "\$2" | tr ',' ' '); do
+      base="\$DL/Wild_Isles____s01e05_-_Episode\${sd}---\$pid"
+      echo "INFO: Downloading \$pid"
+      for i in 1 2 3 4 5 6 7 8; do dd if=/dev/zero bs=1024 count=200 2>/dev/null >> "\$base.video.m4v"; sleep 1; done
+      dd if=/dev/zero of="\$base.audio.m4a" bs=1024 count=100 2>/dev/null; sleep 2
+      mv "\$base.video.m4v" "\$base.partial.mp4"; rm -f "\$base.audio.m4a"; sleep 3
+      mv "\$base.partial.mp4" "\$base.mp4"
+      echo "INFO: Recorded \$base.mp4"
+    done
+    ;;
+esac
+SH
+chmod +x bin/get-iplayer
+
+cat > bin/yt-dlp <<'SH'
+#!/bin/sh
+# Fake yt-dlp for development.
+if [ "$1" = "-J" ]; then
+  sleep 1
+  cat <<'JSON'
+{"id":"dQw4w9WgXcQ","title":"Sample Video","channel":"Sample Channel","duration":212,"thumbnail":"",
+ "formats":[
+  {"format_id":"140","ext":"m4a","vcodec":"none","acodec":"mp4a.40.2","tbr":129.5,"filesize":3433148,"format_note":"medium"},
+  {"format_id":"251","ext":"webm","vcodec":"none","acodec":"opus","tbr":135.1,"filesize_approx":3500000,"format_note":"medium"},
+  {"format_id":"18","ext":"mp4","vcodec":"avc1.42001E","acodec":"mp4a.40.2","height":360,"resolution":"640x360","fps":25,"tbr":500,"filesize":13000000,"format_note":"360p"},
+  {"format_id":"137","ext":"mp4","vcodec":"avc1.640028","acodec":"none","height":1080,"resolution":"1920x1080","fps":25,"tbr":4400,"filesize":110000000,"format_note":"1080p"},
+  {"format_id":"136","ext":"mp4","vcodec":"avc1.4d401f","acodec":"none","height":720,"resolution":"1280x720","fps":25,"tbr":2300,"format_note":"720p"}
+ ]}
+JSON
+  exit 0
+fi
+out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
+dir=$(dirname "$out" | sed 's/%(channel)s/Sample Channel/'); mkdir -p "$dir"
+echo "[youtube] dQw4w9WgXcQ: Downloading webpage"
+echo "[download] Destination: $dir/Sample Video.mp4"
+for p in 5.0 18.2 33.9 51.4 67.0 82.5 96.1 100; do echo "[download]  $p% of   10.00MiB at  2.00MiB/s ETA 00:04"; sleep 1; done
+: > "$dir/Sample Video.mp4"
+SH
+chmod +x bin/yt-dlp
+
 echo "Sample library created in $ROOT"
 echo "Point .env at it with:"
 cat <<EOF
@@ -78,5 +155,7 @@ MEDIA_SEARCH_INDEX=$ROOT/private/search
 MEDIA_CAST_PATH=$ROOT/public-cast
 MEDIA01_SSH=$ROOT/bin/ssh22
 MEDIA01_ROOT=$ROOT/media01/Video
+MEDIA_IPLAYER_COMMAND=$ROOT/bin/get-iplayer
+MEDIA_YTDLP=$ROOT/bin/yt-dlp
 MEDIA_COPY_QUEUE=$ROOT/public/admin/file_copy_queue
 EOF

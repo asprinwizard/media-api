@@ -49,6 +49,7 @@ describe('fileinfo', function () {
     it('falls back down the mode order and copes with modesizes', function () {
         expect(IplayerInfo::parse("qualitysizes:  original: sd=640MB,web=401MB\n")->expectedSize())->toBe(640.0 * 1024 * 1024)
             ->and(IplayerInfo::parse("modesizes:  hd=1.5GB,sd=600MB\n")->expectedSize())->toBe(1.5 * 1024 ** 3)
+            ->and(IplayerInfo::parse("qualitysizes:  original: fhd=2GB,sd=640MB\n")->expectedSize(sdCopy: true))->toBe(640.0 * 1024 * 1024)
             ->and(IplayerInfo::parse("title: x\n")->expectedSize())->toBeNull()
             ->and(IplayerInfo::parse('')->title())->toBeNull();
     });
