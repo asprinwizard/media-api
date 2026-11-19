@@ -50,6 +50,17 @@ done
 for n in 1 2 3; do echo "2026/11/18 21:0$n:12 [1234] >f+++++++++ TV/Drama/Harbour Lights/Series 2 (2025)/S02E0$n.mp4"; done > logs/media01-tv.log
 echo "2026/11/18 18:12:40 [999] >f+++++++++ Movies/The Lantern Keeper (2019)/The Lantern Keeper (2019).mp4" > logs/media01-movies.log
 ln -s "$ROOT/drives/hd02/Movies/Kestrel/missing.mp4" "drives/hd02/Movies/Kestrel/gone.mp4"
+
+# A fake media01 (a folder) and a fake ssh22 that runs commands against it,
+# exactly as ssh + the remote shell would. Plus admin bits for Phase 3.
+mkdir -p media01/Video/Movies media01/Video/TV/Drama/"Harbour Lights"/"Series 1 (2023)" media01/Video/TV/Comedy bin public/admin
+: > media01/Video/TV/Drama/"Harbour Lights"/"Series 1 (2023)"/"S01E01 - Pilot.mp4"
+printf '#!/bin/sh\nshift\nexec sh -c "$*"\n' > bin/ssh22 && chmod +x bin/ssh22
+mkdir -p "share/Video/Uploaded Files/get_iplayer"
+for f in "Harbour_Lights____s02e05_-_Undertow---m002x4kq.mp4" "Harbour_Lights____s02e06_-_The_Tide_Turns---m002x4kr.mp4" "Wild_Isles____s01e03_-_Cliffs---m001xq2c.mp4"; do
+    : > "share/Video/Uploaded Files/get_iplayer/$f"
+done
+(cd "share/Video/Uploaded Files/get_iplayer" && printf 'hello' > readme.txt && tar -czf extras.tar.gz readme.txt && rm readme.txt)
 printf 'admin: richard\nftp: richard bob\nstandard: alice bob richard\n' > htgroup
 
 echo "Sample library created in $ROOT"
@@ -65,4 +76,7 @@ MEDIA_LOG_DIR=$ROOT/logs
 MEDIA_ALLOWED_MOUNTS=$ROOT/drives/hd01,$ROOT/drives/hd02
 MEDIA_SEARCH_INDEX=$ROOT/private/search
 MEDIA_CAST_PATH=$ROOT/public-cast
+MEDIA01_SSH=$ROOT/bin/ssh22
+MEDIA01_ROOT=$ROOT/media01/Video
+MEDIA_COPY_QUEUE=$ROOT/public/admin/file_copy_queue
 EOF
