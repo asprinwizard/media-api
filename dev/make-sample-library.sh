@@ -86,13 +86,13 @@ case "\$1" in
 get_iplayer v3.35, Copyright (C) 2008-2010 Phil Lewis
 
 Matches:
-1201:	Wild Isles: Series 1 - 3. Cliffs, BBC Two, m001xq2c
-1202:	Wild Isles: Series 1 - 4. Moorland, BBC Two, m001xq2d
-1203:	Wild Isles: Series 1 - 5. Estuaries, BBC Two, m001xq2f
-1204:	Wild Isles of the North: Special, BBC Four, m001xq2g
-
-INFO: 4 matching programmes
 OUT
+    case "\$2" in
+      *news*) printf '3001:\tBBC News at Six: 19/11/2026, BBC One, m00n0001\n3002:\tBBC News at Ten: 19/11/2026, BBC One, m00n0002\n' ;;
+      *weather*) printf '4001:\tWeather for the Week Ahead: 19/11/2026, BBC One, m00w0001\n' ;;
+      *) printf '1201:\tWild Isles: Series 1 - 3. Cliffs, BBC Two, m001xq2c\n1202:\tWild Isles: Series 1 - 4. Moorland, BBC Two, m001xq2d\n1203:\tWild Isles: Series 1 - 5. Estuaries, BBC Two, m001xq2f\n1204:\tWild Isles of the North: Special, BBC Four, m001xq2g\n' ;;
+    esac
+    printf '\nINFO: matching programmes\n'
     ;;
   --info)
     pid="\$3"
