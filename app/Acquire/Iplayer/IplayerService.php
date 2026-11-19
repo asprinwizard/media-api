@@ -21,6 +21,9 @@ class IplayerService
     /** A download whose files haven't changed for this long is reported as stalled. */
     private const STALLED_AFTER = 1800;
 
+    /** Seconds a just-written .mp4 must stay untouched before it counts as completed. */
+    private const SETTLE_AFTER = 10;
+
     /** Seconds a converting file must stay the same size to count as finishing. */
     private const FINISHING_AFTER = 15;
 
@@ -177,7 +180,7 @@ class IplayerService
                 // so one untouched for a long while has been abandoned.
                 $stalled = $track['status'] !== IplayerStatusResolver::COMPLETED
                     && $now - $track['mtime'] > self::STALLED_AFTER;
-                $status = $stalled ? 'stalled' : $this->finishing($track, $now);
+                $status = $stalled ? 'stalled' : $this->settled($item['pid'], $kind, $this->finishing($track, $now), $track, $now);
                 $active = $active || ($status !== IplayerStatusResolver::COMPLETED && ! $stalled);
                 $tracks[$kind] = [
                     'status' => $status,
@@ -199,6 +202,32 @@ class IplayerService
         }
 
         return ['active' => $active, 'queue' => $queue, 'items' => $items];
+    }
+
+    /**
+     * Between stages get_iplayer briefly leaves just the .mp4 (renamed from
+     * .partial.mp4 a moment before it saves the cover art), which reads as
+     * completed. So a track that was converting or tagging at the last check
+     * stays "tagging" until its .mp4 has been left alone for a few seconds.
+     *
+     * @param  array{status: string, file: string, size: ?float, mtime: int}  $track
+     */
+    private function settled(string $pid, string $kind, string $status, array $track, int $now): string
+    {
+        $key = "iplayer:last:{$pid}:{$kind}";
+        if ($status !== IplayerStatusResolver::COMPLETED) {
+            Cache::put($key, $status, 3600);
+
+            return $status;
+        }
+        $was = Cache::get($key);
+        $busy = in_array($was, [IplayerStatusResolver::CONVERTING, IplayerStatusResolver::FINISHING, IplayerStatusResolver::TAGGING], true);
+        if ($busy && $now - $track['mtime'] < self::SETTLE_AFTER) {
+            return IplayerStatusResolver::TAGGING;
+        }
+        Cache::forget($key);
+
+        return $status;
     }
 
     /**

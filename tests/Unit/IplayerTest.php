@@ -97,6 +97,10 @@ describe('status resolver', function () {
             'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.hls.ts' => [1807674144],
             'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.partial.mp4' => [940298240],
         ], R::CONVERTING, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.partial.mp4', 1807674144.0],
+        'renamed, source not yet deleted' => [[
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.hls.ts' => [1807674144],
+            'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4' => [1758921096],
+        ], R::TAGGING, 'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4', null],
         'cover art saved' => [[
             'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.jpg' => [122880],
             'In_the_Night_Garden____s01e34_-_The_Pontipines_on_the_Ninky_Nonk---b00796ry.mp4' => [1758921096],

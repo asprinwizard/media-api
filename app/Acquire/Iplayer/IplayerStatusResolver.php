@@ -123,6 +123,10 @@ final class IplayerStatusResolver
         if ($partial = $find('/^\.partial\.mp4$/')) {
             return $at(self::CONVERTING, $partial, $source);
         }
+        if ($source && $mp4) {
+            // Converted and renamed; the source is about to be deleted.
+            return ['status' => self::TAGGING, 'file' => $mp4->name, 'size' => null, 'basis' => null, 'mtime' => $mp4->mtime];
+        }
         if ($source) {
             return ['status' => self::CONVERTING, 'file' => $source->name, 'size' => 0.0, 'basis' => $source->size, 'mtime' => $source->mtime];
         }

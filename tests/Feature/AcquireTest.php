@@ -260,12 +260,23 @@ describe('iplayer', function () {
         $sized("$dir/Show____s01e01_-_One---b0000001.partial.mp4", 1750);
         expect($main($now + 22)['status'])->toBe('converting');
 
-        // Tagging: the temp copy is measured against the finished .mp4.
+        // Renamed to .mp4 before the cover art appears: not completed yet...
         unlink("$dir/Show____s01e01_-_One---b0000001.partial.mp4");
         unlink("$dir/Show____s01e01_-_One---b0000001.hls.ts");
         $sized("$dir/Show____s01e01_-_One---b0000001.mp4", 1750);
+        touch("$dir/Show____s01e01_-_One---b0000001.mp4", $now + 23);
+        expect($main($now + 24)['status'])->toBe('tagging');
+
+        // Tagging: the temp copy is measured against the finished .mp4.
         $sized("$dir/Show____s01e01_-_One---b0000001-temp-123.mp4", 500);
         expect($main($now + 30))->toMatchArray(['status' => 'tagging', 'label' => 'Adding tags and artwork', 'size' => 500.0, 'expectedSize' => 1750.0]);
+
+        // Tagged copy renamed over the .mp4: tagging for a few seconds more, then completed for good.
+        unlink("$dir/Show____s01e01_-_One---b0000001-temp-123.mp4");
+        touch("$dir/Show____s01e01_-_One---b0000001.mp4", $now + 32);
+        expect($main($now + 33)['status'])->toBe('tagging')
+            ->and($main($now + 43)['status'])->toBe('completed')
+            ->and($main($now + 44)['status'])->toBe('completed');
     });
 });
 
