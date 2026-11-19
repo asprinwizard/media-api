@@ -81,6 +81,34 @@ return [
     // scripts/cron/copy_file_queue reads this path; keep them in step).
     'copy_queue' => env('MEDIA_COPY_QUEUE', '/home/public/media/admin/file_copy_queue'),
 
+    // Admin "Convert" (CloudConvert). Presets are CloudConvert convert-task
+    // options; results land under export_root mirroring the source path.
+    'convert' => [
+        'export_root' => env('MEDIA_CONVERT_EXPORT_ROOT', '/home/ftp/media/cloudconvert'),
+        'presets' => [
+            'reencode' => [
+                'label' => 'Re-encode MP4 (H.264, CRF 23, audio copied)',
+                'options' => [
+                    'input_format' => 'mp4',
+                    'output_format' => 'mp4',
+                    'engine' => 'ffmpeg_nvidia',
+                    'video_codec' => 'x264',
+                    'crf' => 23,
+                    'preset' => 'medium',
+                    'fit' => 'scale',
+                    'subtitles_mode' => 'none',
+                    'audio_codec' => 'copy',
+                ],
+            ],
+        ],
+    ],
+
+    // Admin "Extract": jobs run in the background; status files live here.
+    'extract' => [
+        'jobs_path' => env('MEDIA_EXTRACT_JOBS', storage_path('app/extract-jobs')),
+        'timeout' => (int) env('MEDIA_EXTRACT_TIMEOUT', 3 * 3600),
+    ],
+
     'media01' => [
         'host' => env('MEDIA01_HOST', 'media01'),
         'user' => env('MEDIA01_USER', 'root'),

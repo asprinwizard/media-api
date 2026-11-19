@@ -10,6 +10,7 @@
     "license": "proprietary",
     "require": {
         "php": "^8.3",
+        "cloudconvert/cloudconvert-php": "^3.4",
         "james-heinrich/getid3": "^1.9",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0"

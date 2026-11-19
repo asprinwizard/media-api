@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Admin\Convert\CloudConvertConverter;
+use App\Admin\Convert\Converter;
 use App\Admin\CopyQueue;
+use App\Admin\Extract\ArchiveExtractor;
+use App\Admin\Extract\ExtractJobs;
 use App\Auth\HtgroupRepository;
 use App\Library\CastLinks;
 use App\Library\DirectoryReader;
@@ -48,6 +52,16 @@ class AppServiceProvider extends ServiceProvider
             config('media.copy_queue'),
             config('media.media01.user').'@'.config('media.media01.host'),
             config('media.media01.root'),
+        ));
+
+        $this->app->bind(ExtractJobs::class, fn () => new ExtractJobs(config('media.extract.jobs_path')));
+        $this->app->bind(ArchiveExtractor::class, fn ($app) => new ArchiveExtractor(
+            $app->make(LocalShell::class),
+            config('media.extract.timeout'),
+        ));
+        $this->app->bind(Converter::class, fn () => new CloudConvertConverter(
+            config('services.cloudconvert.key'),
+            config('services.sftp'),
         ));
 
         $this->app->bind(CastLinks::class, fn () => new CastLinks(

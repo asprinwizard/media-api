@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\FileOperationsController;
+use App\Http\Controllers\Admin\JobsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\LibraryController;
@@ -40,5 +41,13 @@ Route::middleware(['media.user', 'same-origin'])->group(function () {
         Route::post('/items/delete', 'delete');
         Route::get('/copy-queue', 'copyQueue');
         Route::post('/copy-queue', 'queueCopy');
+    });
+
+    Route::middleware('role:admin')->prefix('admin')->controller(JobsController::class)->group(function () {
+        Route::post('/extract', 'startExtract');
+        Route::get('/extract/{id}', 'extractStatus');
+        Route::get('/convert/presets', 'presets');
+        Route::post('/convert', 'startConvert');
+        Route::get('/convert/jobs', 'convertJobs');
     });
 });
