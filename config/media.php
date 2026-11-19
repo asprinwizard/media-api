@@ -153,6 +153,53 @@ return [
         'root' => env('MEDIA01_ROOT', '/sharedfolders/Video'),
     ],
 
+    // Live TV (admin): media08 streams HLS, proxied by Apache at /hls/.
+    // It sleeps when idle; the page wakes it (Wake-on-LAN) and waits.
+    'live_tv' => [
+        'host' => env('LIVE_TV_HOST', 'media08'),
+        // Reachability check: a TCP connect to this port (ssh), as before.
+        'check_port' => (int) env('LIVE_TV_CHECK_PORT', 22),
+        'ssh_user' => env('LIVE_TV_SSH_USER', 'media08'),
+        'mac' => env('STREAMER_MAC_ADDRESS'),
+        'wakeonlan' => env('MEDIA_WAKEONLAN', 'wakeonlan'),
+        'hls' => env('LIVE_TV_HLS', '/hls/stream.m3u8'),
+        'boot_timeout' => (int) env('LIVE_TV_BOOT_TIMEOUT', 120),
+    ],
+
+    // Logs page (admin): only these files can be viewed. key => [title, path]
+    'logs' => [
+        'media01-movies' => ['Movies', env('MEDIA_LOG_DIR', '/var/log').'/media01-movies.log'],
+        'media01-tv' => ['TV', env('MEDIA_LOG_DIR', '/var/log').'/media01-tv.log'],
+        'copy_file_queue' => ['File Copy Queue', env('MEDIA_LOG_DIR', '/var/log').'/copy_file_queue.log'],
+        'file_actions' => ['File Actions', env('MEDIA_PUBLIC_PATH', '/home/public/media').'/logs/file_actions.log'],
+        'file_searches' => ['File Searches', env('MEDIA_PUBLIC_PATH', '/home/public/media').'/logs/file_searches.log'],
+        'rsnapshot' => ['System Backup', env('MEDIA_LOG_DIR', '/var/log').'/rsnapshot.log'],
+        'iplayer_search' => ['iPlayer Search', env('MEDIA_LOG_DIR', '/var/log').'/get_iplayer/get_iplayer_search.log'],
+        'iplayer_download' => ['iPlayer Download', env('MEDIA_LOG_DIR', '/var/log').'/get_iplayer/get_iplayer_download.log'],
+        'youtube_download' => ['YouTube Download', env('MEDIA_LOG_DIR', '/var/log').'/yt-dlp/youtube_download.log'],
+        'cloudconvert_sync' => ['Cloudconvert Sync', env('MEDIA_LOG_DIR', '/var/log').'/cloudconvert_sync.log'],
+        's3_backup' => ['S3 Backup', env('MEDIA_LOG_DIR', '/var/log').'/s3_backup.log'],
+        'beelink_convert' => ['Beelink Convert', env('MEDIA_LOG_DIR', '/var/log').'/beelink_convert.log'],
+        'sync_folder' => ['Sync Folder (temporary)', env('MEDIA_LOG_DIR', '/var/log').'/sync_folder.log'],
+        'media-api' => ['This site (errors and admin actions)', storage_path('logs/laravel.log')],
+    ],
+
+    // Tools (admin).
+    'tools' => [
+        // hdparm -C reports whether each drive is spinning (it doesn't wake them).
+        // media02 runs it as www-data through sudo, as before; media01 as root.
+        'hdparm' => env('MEDIA_HDPARM', '/sbin/hdparm'),
+        'hdparm_sudo' => (bool) env('MEDIA_HDPARM_SUDO', true),
+        'media01_hdparm' => env('MEDIA01_HDPARM', '/sbin/hdparm'),
+        // Library folders whose symlink targets are shown on the Drives tab.
+        'link_folders' => ['Movies', 'TV/Comedy', 'TV/Documentary', 'TV/Drama', 'TV/Music', 'TV/Sport'],
+        // Latest files: how many to keep from a scan, and how long a scan is reused.
+        'latest_keep' => 1000,
+        'latest_cache_dir' => env('MEDIA_LATEST_CACHE_DIR', storage_path('app/latest-files')),
+        'latest_cache_minutes' => (int) env('MEDIA_LATEST_CACHE_MINUTES', 15),
+        'latest_timeout' => (int) env('MEDIA_LATEST_TIMEOUT', 900),
+    ],
+
     'php_binary' => env('MEDIA_PHP_BINARY', '/usr/bin/php8.4'),
 
     // Main navigation, in display order. 'roles' => null means every user.

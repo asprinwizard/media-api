@@ -13,6 +13,10 @@ use App\Admin\Extract\ExtractJobs;
 use App\Auth\HtgroupRepository;
 use App\Library\CastLinks;
 use App\Library\DirectoryReader;
+use App\Ops\DriveReport;
+use App\Ops\LatestFiles;
+use App\Ops\LiveTv;
+use App\Ops\LogViewer;
 use App\Servers\LocalMediaServer;
 use App\Servers\Media01Server;
 use App\Support\Paths\MediaPathResolver;
@@ -91,6 +95,36 @@ class AppServiceProvider extends ServiceProvider
             config('media.youtube.download_dir'),
             config('media.youtube.log'),
             config('media.youtube.info_timeout'),
+        ));
+
+        $this->app->bind(LiveTv::class, fn ($app) => new LiveTv(
+            $app->make(LocalShell::class),
+            new RemoteShell($app->make(LocalShell::class), config('media.media01.ssh'), config('media.live_tv.ssh_user').'@'.config('media.live_tv.host')),
+            config('media.live_tv.host'),
+            config('media.live_tv.check_port'),
+            config('media.live_tv.mac'),
+            config('media.live_tv.wakeonlan'),
+        ));
+        $this->app->bind(LogViewer::class, fn ($app) => new LogViewer($app->make(LocalShell::class), config('media.logs')));
+        $this->app->bind(DriveReport::class, fn ($app) => new DriveReport(
+            $app->make(LocalShell::class),
+            $app->make('shell.media01'),
+            config('media.tools.link_folders'),
+            config('media.paths.library'),
+            config('media.tools.hdparm'),
+            config('media.tools.hdparm_sudo'),
+            config('media.media01.root'),
+            config('media.tools.media01_hdparm'),
+        ));
+        $this->app->bind(LatestFiles::class, fn ($app) => new LatestFiles(
+            $app->make(LocalShell::class),
+            $app->make('shell.media01'),
+            config('media.paths.library'),
+            config('media.media01.root'),
+            config('media.tools.latest_cache_dir'),
+            config('media.tools.latest_keep'),
+            config('media.tools.latest_cache_minutes'),
+            config('media.tools.latest_timeout'),
         ));
 
         $this->app->bind(CastLinks::class, fn () => new CastLinks(

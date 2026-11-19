@@ -9,6 +9,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\MeController;
+use App\Http\Controllers\Ops\LiveTvController;
+use App\Http\Controllers\Ops\LogController;
+use App\Http\Controllers\Ops\ToolsController;
 use App\Http\Controllers\SearchController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,6 +57,15 @@ Route::middleware(['media.user', 'same-origin'])->group(function () {
         Route::get('/info', 'info');
         Route::post('/downloads', 'download');
         Route::get('/status', 'status');
+    });
+
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/live-tv/status', [LiveTvController::class, 'status']);
+        Route::post('/live-tv/actions', [LiveTvController::class, 'action']);
+        Route::get('/logs', [LogController::class, 'index']);
+        Route::get('/logs/{key}', [LogController::class, 'show']);
+        Route::get('/tools/drives', [ToolsController::class, 'drives']);
+        Route::get('/tools/latest', [ToolsController::class, 'latest']);
     });
 
     Route::middleware('role:admin')->prefix('admin')->controller(FileOperationsController::class)->group(function () {
