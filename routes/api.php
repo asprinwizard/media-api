@@ -35,6 +35,7 @@ Route::middleware(['media.user', 'same-origin'])->group(function () {
 
     Route::middleware('role:admin')->prefix('admin')->controller(FileOperationsController::class)->group(function () {
         Route::get('/servers', 'servers');
+        Route::get('/media01/library', 'media01Library');
         Route::get('/folders', 'folders');
         Route::post('/folders', 'createFolder');
         Route::post('/items/move', 'move');

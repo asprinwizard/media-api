@@ -42,6 +42,30 @@ describe('servers and folder pickers', function () {
             ->assertJsonPath('folders.1.path', 'TV/Drama');
     });
 
+    it('lists a media01 folder with its files, for browsing media01', function () {
+        mkdir("{$this->m1}/TV/Drama/Show/Extras");
+        file_put_contents("{$this->m1}/TV/Drama/Show/".NASTY, 'abc');
+
+        $response = asUser('richard')->getJson('/admin/media01/library?path=TV/Drama/Show')->assertOk()
+            ->assertJsonPath('server', 'media01')
+            ->assertJsonPath('path', 'TV/Drama/Show');
+
+        $items = collect($response->json('items'));
+        expect($items->pluck('name')->all())->toBe(['Extras', 'ep1.mp4', NASTY]);
+        expect($items->firstWhere('name', NASTY))->toMatchArray(['type' => 'video', 'size' => 3, 'path' => 'TV/Drama/Show/'.NASTY]);
+        expect($items->firstWhere('name', 'ep1.mp4'))->toHaveKey('suggestedName');
+    });
+
+    it('404s a folder that is not on media01, 502s when unreachable, and is admin only', function () {
+        asUser('richard')->getJson('/admin/media01/library?path=Movies/Nope')->assertNotFound()
+            ->assertJsonPath('message', 'That folder is not on media01.');
+        asUser('alice')->getJson('/admin/media01/library?path=TV')->assertForbidden();
+        asUser('richard')->getJson('/admin/media01/library?path=../../etc')->assertStatus(400);
+
+        fakeMedia01($this->base, reachable: false);
+        asUser('richard')->getJson('/admin/media01/library?path=TV')->assertStatus(502);
+    });
+
     it('rejects traversal on both servers', function () {
         asUser('richard')->getJson('/admin/folders?server=media02&path=../../etc')->assertStatus(400);
         asUser('richard')->getJson('/admin/folders?server=media01&path=../../etc')->assertStatus(400);

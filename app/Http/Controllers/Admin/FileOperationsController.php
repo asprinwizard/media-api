@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Admin\CopyQueue;
 use App\Auth\MediaUser;
 use App\Http\Controllers\Controller;
+use App\Library\LibraryService;
 use App\Library\SortKey;
 use App\Servers\Media01Server;
 use App\Servers\ServerOperationFailed;
@@ -43,6 +44,29 @@ class FileOperationsController extends Controller
         }
 
         return response()->json(['media02' => true, 'media01' => $onMedia01, 'media01Error' => $error]);
+    }
+
+    /**
+     * A media01 folder's contents, for browsing media01 in Manage mode.
+     */
+    public function media01Library(Request $request, MediaUser $user, Media01Server $media01, LibraryService $library): JsonResponse
+    {
+        $input = $request->validate([
+            'path' => ['nullable', 'string', 'max:4096'],
+            'sort' => ['nullable', 'in:name,date'],
+            'dir' => ['nullable', 'in:asc,desc'],
+        ]);
+        $folder = $this->servers->path('media01', $input['path'] ?? '', $user);
+
+        try {
+            $entries = $media01->listing($folder->relative);
+        } catch (ServerOperationFailed $e) {
+            $status = str_contains($e->getMessage(), 'not on media01') ? 404 : 502;
+
+            return response()->json(['message' => $e->getMessage()], $status);
+        }
+
+        return response()->json($library->present($folder, $entries, $user, $input['sort'] ?? 'name', $input['dir'] ?? 'asc', 'media01'));
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Servers;
 
 use App\Library\DirectoryEntry;
+use App\Library\DirectoryReader;
 use App\Library\FileType;
 use App\Library\SortKey;
 use App\Support\Shell\RemoteShell;
@@ -25,6 +26,9 @@ class Media01Server implements MediaServer
         .'mv -n -- "$1" "$2"';
 
     private const DELETE = '[ -e "$1" ] || [ -L "$1" ] || { echo "It no longer exists." >&2; exit 3; }; rm -rf -- "$1"';
+
+    private const LISTING = '[ -d "$1" ] || { echo "That folder is not on media01." >&2; exit 3; }; '
+        .'find -L "$1" -mindepth 1 -maxdepth 1 -printf "%y\\t%s\\t%T@\\t%f\\0"; exit 0';
 
     private const FOLDERS = 'find -L "$1" -mindepth 1 -maxdepth 1 -type d -printf "%f\0"';
 
@@ -79,6 +83,19 @@ class Media01Server implements MediaServer
         );
 
         return array_map(fn (DirectoryEntry $e) => $e->name, SortKey::sort($entries));
+    }
+
+    /**
+     * Full listing of a media01 folder (same format as media02's DirectoryReader).
+     *
+     * @return list<DirectoryEntry>
+     */
+    public function listing(string $relative): array
+    {
+        $result = $this->shell->script(self::LISTING, [$this->abs($relative)], 120);
+        $this->check($result, 'Couldn\'t list the folder on media01.');
+
+        return DirectoryReader::parse($result->output());
     }
 
     private function abs(string $relative): string

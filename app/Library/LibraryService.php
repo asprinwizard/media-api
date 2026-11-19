@@ -31,7 +31,20 @@ class LibraryService
             ));
         }
 
+        return $this->present($folder, $entries, $user, $sort, $direction);
+    }
+
+    /**
+     * Shape a folder's entries for the Library screen. Also used for media01
+     * listings (admin "Browsing: media01"), with the server named.
+     *
+     * @param  list<DirectoryEntry>  $entries
+     * @return array<string, mixed>
+     */
+    public function present(MediaPath $folder, array $entries, MediaUser $user, string $sort = 'name', string $direction = 'asc', string $server = 'media02'): array
+    {
         return [
+            'server' => $server,
             'path' => $folder->relative,
             'name' => $folder->isRoot() ? 'Video' : $folder->name(),
             'breadcrumbs' => $this->breadcrumbs($folder),
