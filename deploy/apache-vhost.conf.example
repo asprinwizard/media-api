@@ -42,6 +42,12 @@
         Require group admin ftp standard
     </Location>
 
+    # "Sign out" lands here; it must open without a login (see media-app's
+    # src/lib/signOut.ts), or the browser would prompt straight away.
+    <LocationMatch "^/(signed-out\.html|favicon\.svg)$">
+        Require all granted
+    </LocationMatch>
+
     # --- SPA (media-app/dist) -------------------------------------------------
     DocumentRoot /home/sites/media-app/dist
     <Directory /home/sites/media-app/dist>
