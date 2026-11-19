@@ -77,6 +77,10 @@ return [
         'media01-movies' => 'Movies',
     ],
 
+    // Lines root's hourly cron runs to copy files to media01 (media-web's
+    // scripts/cron/copy_file_queue reads this path; keep them in step).
+    'copy_queue' => env('MEDIA_COPY_QUEUE', '/home/public/media/admin/file_copy_queue'),
+
     'media01' => [
         'host' => env('MEDIA01_HOST', 'media01'),
         'user' => env('MEDIA01_USER', 'root'),

@@ -2,6 +2,7 @@
 
 namespace App\Library;
 
+use App\Admin\SmartFileNamer;
 use App\Auth\MediaUser;
 use App\Support\Paths\MediaPath;
 use App\Support\Paths\MediaPathResolver;
@@ -44,7 +45,8 @@ class LibraryService
                 'size' => $e->size,
                 'mtime' => $e->mtime,
                 'letter' => SortKey::letter($e->name),
-            ], SortKey::sort($entries, $sort, $direction)),
+            ] + ($user->isAdmin() && $e->type !== FileType::Folder ? ['suggestedName' => SmartFileNamer::suggest($e->name)] : []),
+                SortKey::sort($entries, $sort, $direction)),
         ];
     }
 

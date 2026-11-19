@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use App\Admin\CopyQueue;
 use App\Auth\HtgroupRepository;
 use App\Library\CastLinks;
+use App\Library\DirectoryReader;
+use App\Servers\LocalMediaServer;
+use App\Servers\Media01Server;
 use App\Support\Paths\MediaPathResolver;
 use App\Support\Shell\LocalShell;
 use App\Support\Shell\RemoteShell;
@@ -29,13 +33,30 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(LocalShell::class);
 
+        $this->app->bind(LocalMediaServer::class, fn ($app) => new LocalMediaServer(
+            config('media.paths.library'),
+            $app->make(LocalShell::class),
+            $app->make(DirectoryReader::class),
+        ));
+
+        $this->app->bind(Media01Server::class, fn ($app) => new Media01Server(
+            $app->make('shell.media01'),
+            config('media.media01.root'),
+        ));
+
+        $this->app->bind(CopyQueue::class, fn () => new CopyQueue(
+            config('media.copy_queue'),
+            config('media.media01.user').'@'.config('media.media01.host'),
+            config('media.media01.root'),
+        ));
+
         $this->app->bind(CastLinks::class, fn () => new CastLinks(
             config('media.cast.path'),
             config('media.cast.url_prefix'),
             config('media.cast.ttl_hours'),
         ));
 
-        $this->app->singleton('shell.media01', fn ($app) => new RemoteShell(
+        $this->app->bind('shell.media01', fn ($app) => new RemoteShell(
             $app->make(LocalShell::class),
             config('media.media01.ssh'),
             config('media.media01.user').'@'.config('media.media01.host'),

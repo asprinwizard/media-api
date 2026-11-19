@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\FileOperationsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\LibraryController;
@@ -29,5 +30,15 @@ Route::middleware(['media.user', 'same-origin'])->group(function () {
         Route::get('/download', 'download');
         Route::get('/cast', 'cast');
         Route::post('/link', 'logLink');
+    });
+
+    Route::middleware('role:admin')->prefix('admin')->controller(FileOperationsController::class)->group(function () {
+        Route::get('/servers', 'servers');
+        Route::get('/folders', 'folders');
+        Route::post('/folders', 'createFolder');
+        Route::post('/items/move', 'move');
+        Route::post('/items/delete', 'delete');
+        Route::get('/copy-queue', 'copyQueue');
+        Route::post('/copy-queue', 'queueCopy');
     });
 });

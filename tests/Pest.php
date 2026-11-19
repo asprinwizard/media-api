@@ -85,3 +85,26 @@ function asUser(string $username): TestCase
 {
     return test()->withServerVariables(['REMOTE_USER' => $username]);
 }
+
+/**
+ * A fake media01: a temp folder plus a fake `ssh22` that runs the remote
+ * command with sh, exactly as ssh + the remote shell would (ssh joins its
+ * arguments with spaces; the remote shell parses the result once).
+ * Returns the fake media01 library root.
+ */
+function fakeMedia01(string $base, bool $reachable = true): string
+{
+    $root = "$base/media01/Video";
+    @mkdir($root, 0777, true);
+    $script = "$base/bin/ssh22";
+    @mkdir(dirname($script), 0777, true);
+    file_put_contents($script, $reachable
+        ? "#!/bin/sh\nshift\nexec sh -c \"\$*\"\n"
+        : "#!/bin/sh\necho 'ssh: connect to host media01 port 22: No route to host' >&2\nexit 255\n");
+    chmod($script, 0755);
+
+    config()->set('media.media01.ssh', $script);
+    config()->set('media.media01.root', $root);
+
+    return $root;
+}
