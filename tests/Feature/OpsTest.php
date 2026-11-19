@@ -58,7 +58,7 @@ describe('live tv', function () {
     });
 
     it('sends fixed power commands over ssh, and accepts the connection dropping', function () {
-        config()->set('media.media01.ssh', ($this->script)('ssh22', "echo \"\$@\" > {$this->base}/ssh; echo 'Connection to media08 closed by remote host.' >&2; exit 255"));
+        config()->set('media.live_tv.ssh', ($this->script)('ssh22', "echo \"\$@\" > {$this->base}/ssh; echo 'Connection to media08 closed by remote host.' >&2; exit 255"));
         asUser('richard')->postJson('/live-tv/actions', ['action' => 'reboot'])->assertOk();
         expect(file_get_contents("{$this->base}/ssh"))->toContain('media08@127.0.0.1')->toContain("'sudo' 'reboot'");
 
@@ -66,7 +66,7 @@ describe('live tv', function () {
     });
 
     it('fails when the box cannot be reached at all', function () {
-        config()->set('media.media01.ssh', ($this->script)('ssh22', "echo 'ssh: connect to host media08 port 22: No route to host' >&2; exit 255"));
+        config()->set('media.live_tv.ssh', ($this->script)('ssh22', "echo 'ssh: connect to host media08 port 22: No route to host' >&2; exit 255"));
         asUser('richard')->postJson('/live-tv/actions', ['action' => 'sleep'])->assertStatus(502);
     });
 });

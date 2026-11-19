@@ -140,6 +140,32 @@ for p in 5.0 18.2 33.9 51.4 67.0 82.5 96.1 100; do echo "[download]  $p% of   10
 SH
 chmod +x bin/yt-dlp
 
+# Phase 5: a pretend Live TV box (wakeonlan "boots" it: a listener on port
+# 8765 appears after 6 seconds), a harmless ssh for its power actions, and
+# an hdparm that reports drive states.
+cat > bin/wakeonlan <<SH
+#!/bin/sh
+echo "Sending magic packet to 255.255.255.255:9 with \$1"
+( sleep 6; exec timeout 900 php -S 127.0.0.1:8765 -t "$ROOT" >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
+SH
+chmod +x bin/wakeonlan
+cat > bin/ssh-livetv <<SH
+#!/bin/sh
+echo "\$(date) ssh \$*" >> "$ROOT/logs/livetv-ssh.log"
+case "\$*" in *shutdown*|*suspend*|*reboot*) pkill -f 'php -S 127.0.0.1:876[5]' ;; esac
+case "\$*" in *reboot*) "$ROOT/bin/wakeonlan" x ;; esac
+exit 0
+SH
+chmod +x bin/ssh-livetv
+cat > bin/hdparm <<'SH'
+#!/bin/sh
+case "$2" in */sda) s="active/idle";; */sdb) s="standby";; *) s="sleeping";; esac
+printf '\n%s:\n drive state is:  %s\n' "$2" "$s"
+SH
+chmod +x bin/hdparm
+mkdir -p logs/get_iplayer
+for i in $(seq 1 40); do echo "2026/11/19 18:$(printf %02d $i):00 copy_file_queue: line $i"; done > logs/copy_file_queue.log
+
 echo "Sample library created in $ROOT"
 echo "Point .env at it with:"
 cat <<EOF
@@ -157,5 +183,13 @@ MEDIA01_SSH=$ROOT/bin/ssh22
 MEDIA01_ROOT=$ROOT/media01/Video
 MEDIA_IPLAYER_COMMAND=$ROOT/bin/get-iplayer
 MEDIA_YTDLP=$ROOT/bin/yt-dlp
+LIVE_TV_HOST=127.0.0.1
+LIVE_TV_CHECK_PORT=8765
+LIVE_TV_SSH=$ROOT/bin/ssh-livetv
+STREAMER_MAC_ADDRESS=aa:bb:cc:dd:ee:ff
+MEDIA_WAKEONLAN=$ROOT/bin/wakeonlan
+MEDIA_HDPARM=$ROOT/bin/hdparm
+MEDIA_HDPARM_SUDO=false
+MEDIA01_HDPARM=$ROOT/bin/hdparm
 MEDIA_COPY_QUEUE=$ROOT/public/admin/file_copy_queue
 EOF

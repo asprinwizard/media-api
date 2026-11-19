@@ -99,7 +99,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(LiveTv::class, fn ($app) => new LiveTv(
             $app->make(LocalShell::class),
-            new RemoteShell($app->make(LocalShell::class), config('media.media01.ssh'), config('media.live_tv.ssh_user').'@'.config('media.live_tv.host')),
+            new RemoteShell($app->make(LocalShell::class), config('media.live_tv.ssh'), config('media.live_tv.ssh_user').'@'.config('media.live_tv.host')),
             config('media.live_tv.host'),
             config('media.live_tv.check_port'),
             config('media.live_tv.mac'),

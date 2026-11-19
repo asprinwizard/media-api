@@ -160,6 +160,7 @@ return [
         // Reachability check: a TCP connect to this port (ssh), as before.
         'check_port' => (int) env('LIVE_TV_CHECK_PORT', 22),
         'ssh_user' => env('LIVE_TV_SSH_USER', 'media08'),
+        'ssh' => env('LIVE_TV_SSH', env('MEDIA01_SSH', 'ssh22')),
         'mac' => env('STREAMER_MAC_ADDRESS'),
         'wakeonlan' => env('MEDIA_WAKEONLAN', 'wakeonlan'),
         'hls' => env('LIVE_TV_HLS', '/hls/stream.m3u8'),
