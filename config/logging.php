@@ -65,9 +65,10 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Monolog inserts the date before the extension: media-api-2026-11-20.log
         'daily' => [
             'driver' => 'daily',
-            'path' => storage_path('logs/laravel.log'),
+            'path' => env('LOG_DAILY_PATH', storage_path('logs/laravel.log')),
             'level' => env('LOG_LEVEL', 'debug'),
             'max_files' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,

@@ -74,6 +74,22 @@ describe('info', function () {
         expect($admin->json('admin'))->toHaveKeys(['path', 'created', 'modified', 'video', 'audio', 'comments', 'raw'])
             ->and($admin->json('admin.path'))->toBe("{$this->show}/ep1.mp4");
     });
+
+    it('flattens nested comment values such as MP4 cover art', function () {
+        $this->mock(\App\Library\FileInspector::class, function ($mock) {
+            $mock->shouldReceive('analyse')->andReturn(['comments' => [
+                'title' => ['The Signalman'],
+                'picture' => [['data' => "\xFF\xD8\xFF\x00", 'image_mime' => 'image/jpeg']],
+            ]]);
+            $mock->shouldReceive('size')->andReturn(10.0);
+            $mock->shouldReceive('mimeType')->andReturn('video/mp4');
+        });
+
+        asUser('richard')->getJson('/files/info?path=TV/Drama/Show/ep1.mp4')
+            ->assertOk()
+            ->assertJsonPath('admin.comments.title', 'The Signalman')
+            ->assertJsonPath('admin.comments.picture', '[binary, 4 bytes], image/jpeg');
+    });
 });
 
 describe('file-link logging', function () {

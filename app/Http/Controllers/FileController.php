@@ -52,10 +52,7 @@ class FileController extends Controller
                 'modified' => @filemtime($absolute) ?: null,
                 'video' => $this->scalars($info['video'] ?? []),
                 'audio' => $this->scalars($info['audio'] ?? []),
-                'comments' => array_map(
-                    fn ($values) => implode(', ', array_map('strval', (array) FileInspector::sanitise($values))),
-                    $info['comments'] ?? [],
-                ),
+                'comments' => array_map($this->commentText(...), $info['comments'] ?? []),
                 'raw' => FileInspector::sanitise($info),
             ],
         ], options: JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
@@ -149,6 +146,23 @@ class FileController extends Controller
      * @param  array<string, mixed>  $section
      * @return array<string, mixed>
      */
+    /**
+     * One getID3 comment as text. Values can be nested arrays (an MP4's
+     * cover art is [['data' => ..., 'image_mime' => ...]]), so flatten them.
+     */
+    private function commentText(mixed $values): string
+    {
+        $parts = [];
+        $sanitised = (array) FileInspector::sanitise($values);
+        array_walk_recursive($sanitised, function ($value) use (&$parts) {
+            if ($value !== null && $value !== '') {
+                $parts[] = is_bool($value) ? var_export($value, true) : (string) $value;
+            }
+        });
+
+        return implode(', ', $parts);
+    }
+
     private function scalars(array $section): array
     {
         return array_filter(
