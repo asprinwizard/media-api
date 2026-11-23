@@ -36,6 +36,7 @@ beforeEach(function () {
         SH);
     chmod("{$this->base}/bin/get-iplayer", 0755);
     config()->set('media.iplayer.command', ["{$this->base}/bin/get-iplayer"]);
+    config()->set('media.iplayer.info_command', []); // not the server's patched copy from .env
 
     config()->set('media.youtube.download_dir', "{$this->base}/upload/youtube");
     config()->set('media.youtube.log', "{$this->base}/logs/yt.log");

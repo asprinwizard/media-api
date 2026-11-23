@@ -336,7 +336,7 @@ class IplayerService
         // lookup leaves the marker (so it's retried later) and logs get-iplayer's
         // errors plus the tail of whatever it printed.
         $script = 'echo "$(date "+%F %T") --info for $0"; "$@" > "$0.tmp"; rc=$?; '
-            .'if [ -s "$0.tmp" ] && grep -q "^title:" "$0.tmp"; then mv "$0.tmp" "$0"; rm -f "$0.fetching"; echo ok; '
+            .'if [ -s "$0.tmp" ] && grep -q "^title:[[:space:]]*[^[:space:]]" "$0.tmp"; then mv "$0.tmp" "$0"; rm -f "$0.fetching"; echo ok; '
             .'else echo "failed (exit $rc), last output:"; tail -n 5 "$0.tmp" 2>/dev/null; rm -f "$0.tmp"; fi';
         $command = $this->infoCommand ?: $this->command;
         $this->shell->background(['sh', '-c', $script, $file, ...$command, '--info', '--pid', $pid], $this->logs['info'], append: true);
