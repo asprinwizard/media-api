@@ -68,3 +68,11 @@ sends media**: downloads redirect to Apache's `/media/…?download`, and
 Chromecast links are symlink folders Apache serves at `/shared/…`.
 (mod_xsendfile is not used: it fails with "unable to stat file" on media02's
 drives.)
+
+iPlayer: downloads use the get-iplayer snap (`sudo get-iplayer`), but the
+`--info` lookups that give the page its titles and expected sizes use a
+patched copy, because get_iplayer 3.36's `--info` dies with "Illegal division
+by zero" on some programmes. Install it with `sudo sh
+scripts/install_get_iplayer_info` and set
+`MEDIA_IPLAYER_INFO_COMMAND=/usr/local/bin/get_iplayer-info`. Lookups are
+logged to `get_iplayer_file_info.log`.

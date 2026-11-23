@@ -35,6 +35,7 @@ class IplayerService
 
     /**
      * @param  list<string>  $command  e.g. ['sudo', 'get-iplayer']
+     * @param  list<string>|null  $infoCommand  for --info lookups; defaults to $command
      * @param  array{search: string, download: string, info: string}  $logs
      * @param  list<string>  $sdCopyArgs
      */
@@ -48,6 +49,7 @@ class IplayerService
         private readonly array $logs,
         private readonly array $sdCopyArgs,
         private readonly int $searchTimeout = 300,
+        private readonly ?array $infoCommand = null,
     ) {}
 
     /**
@@ -330,9 +332,14 @@ class IplayerService
         }
         @touch($marker);
 
-        // Write to a temp file and only keep a non-empty result.
-        $script = '"$@" > "$0.tmp" 2>/dev/null; if [ -s "$0.tmp" ] && grep -q "^title:" "$0.tmp"; then mv "$0.tmp" "$0"; rm -f "$0.fetching"; else rm -f "$0.tmp"; fi';
-        $this->shell->background(['sh', '-c', $script, $file, ...$this->command, '--info', '--pid', $pid], $this->logs['info']);
+        // Write to a temp file and only keep a result with a title. A failed
+        // lookup leaves the marker (so it's retried later) and logs get-iplayer's
+        // errors plus the tail of whatever it printed.
+        $script = 'echo "$(date "+%F %T") --info for $0"; "$@" > "$0.tmp"; rc=$?; '
+            .'if [ -s "$0.tmp" ] && grep -q "^title:" "$0.tmp"; then mv "$0.tmp" "$0"; rm -f "$0.fetching"; echo ok; '
+            .'else echo "failed (exit $rc), last output:"; tail -n 5 "$0.tmp" 2>/dev/null; rm -f "$0.tmp"; fi';
+        $command = $this->infoCommand ?: $this->command;
+        $this->shell->background(['sh', '-c', $script, $file, ...$command, '--info', '--pid', $pid], $this->logs['info'], append: true);
 
         return true;
     }

@@ -23,6 +23,10 @@ it('quotes every argument of a background command', function () {
         ->toContain(escapeshellarg(HOSTILE));
 });
 
+it('can append to the log instead of replacing it', function () {
+    expect(LocalShell::backgroundCommand(['true'], '/tmp/x.log', append: true))->toEndWith(">> '/tmp/x.log' 2>&1 < /dev/null &");
+});
+
 it('background command round-trips hostile arguments through a real shell', function () {
     // Replace the program with printf so the shell shows us the argv it parsed.
     $dir = tempDir('shell');

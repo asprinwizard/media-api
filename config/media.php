@@ -122,6 +122,11 @@ return [
     // options file sets the output folder (download_dir) and filename format.
     'iplayer' => [
         'command' => array_filter(explode(' ', (string) env('MEDIA_IPLAYER_COMMAND', 'sudo get-iplayer'))),
+        // Used only for --info lookups (title, expected size); empty means the
+        // command above. get_iplayer 3.36's --info dies with "Illegal division
+        // by zero" on some BBC manifests, so media02 points this at a patched
+        // copy (scripts/install_get_iplayer_info).
+        'info_command' => array_filter(explode(' ', (string) env('MEDIA_IPLAYER_INFO_COMMAND', ''))),
         'download_dir' => env('MEDIA_IPLAYER_DIR', env('MEDIA_UPLOAD_PATH', '/home/ftp/media').'/get_iplayer'),
         // download_queue (+ _active while running) and <pid>/fileinfo, shared with the old site
         'public_dir' => env('MEDIA_IPLAYER_PUBLIC', env('MEDIA_PUBLIC_PATH', '/home/public/media').'/get_iplayer'),

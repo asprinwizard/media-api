@@ -1,0 +1,54 @@
+#!/bin/sh
+# Installs a patched get_iplayer used only for `--info` lookups (title and
+# expected size on the iPlayer page). Downloads stay on the snap.
+#
+# Why: get_iplayer 3.36 (the latest release, and the snap) dies with
+#   Illegal division by zero at .../get_iplayer line 6256.
+# on `--info` for some programmes. When it works out segment counts it divides
+# by each DASH stream's SegmentTemplate @duration/@timescale, and some BBC
+# streams don't have them (they list segments in a SegmentTimeline instead).
+# Downloads don't hit this because they skip streams outside the wanted
+# bitrate first.
+#
+# Usage (as root, on media02):  sh scripts/install_get_iplayer_info [version]
+# Then set MEDIA_IPLAYER_INFO_COMMAND=/usr/local/bin/get_iplayer-info in .env
+# (and `php artisan config:cache` if the config is cached).
+#
+# It runs as the web user (no sudo) with its own profile folder.
+set -eu
+
+VERSION="${1:-3.36}"
+LIB=/usr/local/lib/get_iplayer-info
+BIN=/usr/local/bin/get_iplayer-info
+PROFILE=/var/lib/get_iplayer-info
+WEB_USER="${WEB_USER:-www-data}"
+
+apt-get install -y --no-install-recommends \
+    libwww-perl liblwp-protocol-https-perl libxml-libxml-perl libmojolicious-perl libcgi-pm-perl curl
+
+mkdir -p "$LIB"
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+curl -fsSL "https://raw.githubusercontent.com/get-iplayer/get_iplayer/v${VERSION}/get_iplayer" -o "$tmp"
+
+# Guard the division. Sizes don't depend on it (they're duration x bitrate),
+# so streams without a fixed segment duration are kept, with a dummy segment
+# count that only a download would use, and this copy never downloads.
+# Fails (and installs nothing) if the lines aren't there, e.g. a fixed release.
+perl -0pi -e '
+    $n = s{^(\s*)my \$segment_duration = \$template->findvalue\(\x27\@duration\x27\) / \$template->findvalue\(\x27\@timescale\x27\);\n\s*my \$num_segments = int\(\$programme_duration / \$segment_duration\);\n}{${1}# patched (media-api install_get_iplayer_info): no division by zero for streams without SegmentTemplate \@duration\n${1}my \$timescale = \$template ? \$template->findvalue(\x27\@timescale\x27) : 0;\n${1}my \$segment_duration = \$timescale ? \$template->findvalue(\x27\@duration\x27) / \$timescale : 0;\n${1}my \$num_segments = \$segment_duration ? int(\$programme_duration / \$segment_duration) : 0;\n}m;
+    END { exit($n == 1 ? 0 : 1) }
+' "$tmp" || { echo "Patch didn't apply: the segment_duration lines have changed in v${VERSION}. Check whether it's fixed upstream." >&2; exit 1; }
+
+perl -c "$tmp"
+install -m 0755 "$tmp" "$LIB/get_iplayer"
+
+install -d -o "$WEB_USER" -g "$WEB_USER" -m 0755 "$PROFILE"
+cat > "$BIN" <<WRAPPER
+#!/bin/sh
+exec /usr/bin/perl $LIB/get_iplayer --profile-dir=$PROFILE "\$@"
+WRAPPER
+chmod 0755 "$BIN"
+
+echo "Installed $BIN (get_iplayer v${VERSION}, patched). Test with:"
+echo "  sudo -u $WEB_USER $BIN --info --pid <pid> | grep -E '^(title|qualitysizes):'"

@@ -207,6 +207,30 @@ describe('iplayer', function () {
             ->assertJsonPath('items.0.main.label', 'Completed');
     });
 
+    it('looks up info with the info command, logging a failed lookup and keeping its marker', function () {
+        // Like get_iplayer 3.36 on some programmes: the banner, then a crash.
+        file_put_contents("{$this->base}/bin/get-iplayer-info", "#!/bin/sh\necho 'get_iplayer v3.36'\necho 'Illegal division by zero at get_iplayer line 6256.' >&2\nexit 255\n");
+        chmod("{$this->base}/bin/get-iplayer-info", 0755);
+        config()->set('media.iplayer.info_command', ["{$this->base}/bin/get-iplayer-info"]);
+        touch("{$this->base}/upload/get_iplayer/Show____s01e01_-_Ep---m001z3k1.video.m4v");
+        file_put_contents("{$this->base}/logs/info.log", "earlier run\n");
+
+        asUser('richard')->getJson('/iplayer/status')->assertOk()
+            ->assertJsonPath('items.0.main.status', 'downloading')
+            ->assertJsonPath('items.0.main.expectedSize', null);
+
+        $log = "{$this->base}/logs/info.log";
+        expect(waitFor(fn () => str_contains((string) @file_get_contents($log), 'failed (exit 255)')))->toBeTrue();
+        expect(file_get_contents($log))->toStartWith("earlier run\n")
+            ->toContain('Illegal division by zero')
+            ->toContain('get_iplayer v3.36');
+        $dir = "{$this->base}/public/get_iplayer/m001z3k1";
+        expect(is_file("$dir/fileinfo.fetching"))->toBeTrue()
+            ->and(file_exists("$dir/fileinfo"))->toBeFalse()
+            ->and(file_exists("$dir/fileinfo.tmp"))->toBeFalse()
+            ->and(file_exists("{$this->base}/logs/argv"))->toBeFalse(); // the download command wasn't used
+    });
+
     it('reports an abandoned file as stalled even while the queue is busy', function () {
         touch("{$this->base}/upload/get_iplayer/Old____s01e01_-_A---b0000009.partial.mp4", time() - 7200);
         mkdir("{$this->base}/public/get_iplayer/b0000009");

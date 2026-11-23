@@ -87,6 +87,7 @@ class AppServiceProvider extends ServiceProvider
             config('media.iplayer.logs'),
             config('media.iplayer.sd_copy_args'),
             config('media.iplayer.search_timeout'),
+            array_values(config('media.iplayer.info_command')) ?: null,
         ));
         $this->app->bind(YoutubeService::class, fn ($app) => new YoutubeService(
             $app->make(LocalShell::class),

@@ -28,20 +28,23 @@ class LocalShell
      * Start a long-running job and return immediately. setsid + closed stdin
      * detach it from the Apache child so it survives a graceful restart.
      *
+     * The log is replaced, or added to when $append is set (for short jobs
+     * that run side by side and would otherwise wipe each other's output).
+     *
      * @param  list<string>  $argv
      */
-    public function background(array $argv, string $logFile): void
+    public function background(array $argv, string $logFile, bool $append = false): void
     {
-        Process::run(['sh', '-c', self::backgroundCommand($argv, $logFile)]);
+        Process::run(['sh', '-c', self::backgroundCommand($argv, $logFile, $append)]);
     }
 
     /**
      * @param  list<string>  $argv
      */
-    public static function backgroundCommand(array $argv, string $logFile): string
+    public static function backgroundCommand(array $argv, string $logFile, bool $append = false): string
     {
         return 'setsid nohup '.self::join($argv)
-            .' > '.escapeshellarg($logFile).' 2>&1 < /dev/null &';
+            .($append ? ' >> ' : ' > ').escapeshellarg($logFile).' 2>&1 < /dev/null &';
     }
 
     /**
