@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
+
 beforeEach(function () {
     useHtgroup("admin: richard\nstandard: alice richard\n");
     $this->base = makeLibrary();
@@ -55,18 +57,30 @@ describe('search', function () {
 });
 
 describe('dashboard', function () {
-    it('shows admins the last 20 lines of the media01 logs', function () {
+    it('shows admins the whole media01 logs', function () {
         file_put_contents("{$this->base}/logs/media01-tv.log", implode("\n", array_map(fn ($i) => "line $i", range(1, 30)))."\n");
 
         $logs = asUser('richard')->getJson('/dashboard')->assertOk()->json('logs');
 
         expect($logs[0]['title'])->toBe('TV')
-            ->and($logs[0]['lines'])->toHaveCount(20)
-            ->and($logs[0]['lines'][19])->toBe('line 30')
+            ->and($logs[0]['lines'])->toHaveCount(30)
+            ->and($logs[0]['lines'][0])->toBe('line 1')
+            ->and($logs[0]['lines'][29])->toBe('line 30')
             ->and($logs[1]['lines'])->toBe([]); // movies log missing
     });
 
     it('shows other users nothing', function () {
         asUser('alice')->getJson('/dashboard')->assertOk()->assertExactJson(['logs' => []]);
+    });
+
+    it('caps a very long log at its last MAX_LINES lines', function () {
+        $total = DashboardController::MAX_LINES + 10;
+        file_put_contents("{$this->base}/logs/media01-tv.log", implode("\n", array_map(fn ($i) => "line $i", range(1, $total)))."\n");
+
+        $lines = asUser('richard')->getJson('/dashboard')->assertOk()->json('logs.0.lines');
+
+        expect($lines)->toHaveCount(DashboardController::MAX_LINES)
+            ->and($lines[0])->toBe('line 11')
+            ->and(end($lines))->toBe("line $total");
     });
 });

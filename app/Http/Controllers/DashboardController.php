@@ -7,11 +7,14 @@ use App\Support\Shell\LocalShell;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Home page extras (port of home.php): admins see the last 20 lines of the
- * media01 TV and Movies copy logs.
+ * Home page extras (port of home.php): admins see the media01 TV and Movies
+ * backup logs, in full up to the last MAX_LINES lines.
  */
 class DashboardController extends Controller
 {
+    /** Guards the page against a runaway log; the panels scroll. */
+    public const MAX_LINES = 5000;
+
     public function __invoke(MediaUser $user, LocalShell $shell): JsonResponse
     {
         if (! $user->isAdmin()) {
@@ -27,7 +30,7 @@ class DashboardController extends Controller
                 continue;
             }
 
-            $result = $shell->run(['tail', '-n', '20', $file], timeout: 10);
+            $result = $shell->run(['tail', '-n', (string) self::MAX_LINES, $file], timeout: 10);
             $logs[] = [
                 'name' => $name,
                 'title' => $title,
