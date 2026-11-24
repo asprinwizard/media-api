@@ -47,6 +47,19 @@ final readonly class MediaPath
     }
 
     /**
+     * The relative path of a typed "new sub-folder" under $base. It may be a
+     * path such as "Show/Series 1 (2026)"; spaces around each part are trimmed.
+     * The result is NOT validated: pass it back through MediaPathResolver,
+     * which refuses ".." and hidden folders and checks containment.
+     */
+    public static function joinSubfolder(string $base, string $subfolder): string
+    {
+        $parts = array_map('trim', explode('/', str_replace('\\', '/', $subfolder)));
+
+        return implode('/', array_filter([$base, ...$parts], fn (string $part) => $part !== ''));
+    }
+
+    /**
      * Validate a single file or folder name (for create / rename).
      */
     public static function assertValidName(string $name): void

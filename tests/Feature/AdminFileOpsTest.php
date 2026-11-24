@@ -112,6 +112,22 @@ describe('move and rename', function () {
             ->and(is_file("{$this->base}/drives/hd02/Movies/From TV/Theme.m4a"))->toBeTrue();
     });
 
+    it('moves into a new nested sub-folder path, and refuses one that climbs out', function () {
+        asUser('richard')->postJson('/admin/items/move', [
+            'server' => 'media02', 'path' => 'TV/Drama/Show',
+            'destination' => 'TV', 'newFolder' => 'The Witch Farm / Series 1 (2026)',
+            'items' => [['name' => 'ep2.mkv']],
+        ])->assertOk()->assertJsonPath('ok', true);
+        expect(is_file("{$this->lib}/TV/The Witch Farm/Series 1 (2026)/ep2.mkv"))->toBeTrue();
+
+        asUser('richard')->postJson('/admin/items/move', [
+            'server' => 'media02', 'path' => 'TV/Drama/Show',
+            'destination' => 'TV', 'newFolder' => 'Show/../../..',
+            'items' => [['name' => 'ep1.mp4']],
+        ])->assertClientError();
+        expect(is_file("{$this->lib}/TV/Drama/Show/ep1.mp4"))->toBeTrue();
+    });
+
     it('moves and renames on media01, with hostile names', function () {
         file_put_contents("{$this->m1}/TV/Drama/Show/".NASTY, 'x');
 
@@ -222,6 +238,23 @@ describe('copy to media01 queue', function () {
         // and the remote mkdir command parses to exactly one path on media01
         exec('sh -c '.escapeshellarg('printf "%s\n" '.substr('mkdir -p -m 777 -- '.escapeshellarg($remoteDir), strlen('mkdir -p -m 777 -- '))), $parsed);
         expect($parsed)->toBe([$remoteDir]);
+    });
+
+    it('accepts a nested new sub-folder path', function () {
+        asUser('richard')->postJson('/admin/copy-queue', [
+            'path' => 'TV/Drama/Show', 'destination' => 'TV', 'newFolder' => ' The Witch Farm / Series 1 (2026)/ ',
+            'files' => [['name' => 'Film (SD).mp4']],
+        ])->assertCreated()->assertJsonPath('destination', 'TV/The Witch Farm/Series 1 (2026)');
+    });
+
+    it('refuses a new sub-folder that climbs out or is hidden', function () {
+        foreach (['../Movies', 'Show/../../etc', '.hidden/Series 1'] as $newFolder) {
+            asUser('richard')->postJson('/admin/copy-queue', [
+                'path' => 'TV/Drama/Show', 'destination' => 'TV', 'newFolder' => $newFolder,
+                'files' => [['name' => 'Film (SD).mp4']],
+            ])->assertClientError();
+        }
+        expect(file_exists($this->queue) ? trim(file_get_contents($this->queue)) : '')->toBe('');
     });
 
     it('shows what is waiting and what is running', function () {

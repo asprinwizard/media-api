@@ -8,6 +8,7 @@ use App\Admin\Extract\ExtractJobs;
 use App\Auth\MediaUser;
 use App\Http\Controllers\Controller;
 use App\Support\Paths\InvalidMediaPath;
+use App\Support\Paths\MediaPath;
 use App\Support\Paths\MediaPathResolver;
 use App\Support\Shell\LocalShell;
 use Illuminate\Http\JsonResponse;
@@ -41,7 +42,7 @@ class JobsController extends Controller
 
         $destination = $this->paths->library($input['destination'] ?? ($input['path'] ?? ''), $user);
         if (! empty($input['newFolder'])) {
-            $destination = $destination->child(trim($input['newFolder']));
+            $destination = $this->paths->library(MediaPath::joinSubfolder($destination->relative, $input['newFolder']), $user);
         }
 
         $id = $jobs->create([

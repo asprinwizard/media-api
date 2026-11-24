@@ -145,7 +145,7 @@ class FileOperationsController extends Controller
             ? $this->servers->path($serverName, $input['destination'], $user)
             : $source;
         if (! empty($input['newFolder'])) {
-            $target = $target->child(trim($input['newFolder']));
+            $target = $this->servers->path($serverName, MediaPath::joinSubfolder($target->relative, $input['newFolder']), $user);
         }
 
         try {
@@ -225,7 +225,7 @@ class FileOperationsController extends Controller
         $destination = $paths->media01($input['destination']);
         abort_if($destination->isRoot(), 422, 'Choose a destination folder on media01.');
         if (! empty($input['newFolder'])) {
-            $destination = $destination->child(trim($input['newFolder']));
+            $destination = $paths->media01(MediaPath::joinSubfolder($destination->relative, $input['newFolder']));
         }
         if (! empty($input['hd'])) {
             $destination = $destination->child('HD');

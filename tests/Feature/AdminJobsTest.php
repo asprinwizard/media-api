@@ -85,6 +85,19 @@ describe('extract', function () {
         asUser('richard')->getJson("/admin/extract/{$job['id']}")->assertJsonPath('status', 'queued');
     });
 
+    it('extracts into a new nested sub-folder path, and refuses one that climbs out', function () {
+        Process::fake();
+        makeZip("{$this->show}/pack.zip", ['a.mp4' => 'A']);
+        config()->set('media.php_binary', '/usr/bin/php');
+
+        $job = asUser('richard')->postJson('/admin/extract', ['path' => 'TV/Drama/Show', 'name' => 'pack.zip', 'newFolder' => 'Extras/Disc 1'])
+            ->assertStatus(202)->json();
+        asUser('richard')->getJson("/admin/extract/{$job['id']}")->assertJsonPath('destinationPath', 'TV/Drama/Show/Extras/Disc 1');
+
+        asUser('richard')->postJson('/admin/extract', ['path' => 'TV/Drama/Show', 'name' => 'pack.zip', 'newFolder' => 'Extras/../../../..'])
+            ->assertClientError();
+    });
+
     it('runs a job to completion and reports it', function () {
         makeZip("{$this->show}/pack.zip", ['a.mp4' => 'A']);
         app()->bind(ArchiveExtractor::class, fn () => new ArchiveExtractor(new LocalShell, 60, unarBinary: 'definitely-not-installed-unar'));
